@@ -120,19 +120,24 @@ export const getWaitingQueues = async (req, res) => {
     const queues = {};
 
     for (const zone of zones) {
-      // Fix: Use correct model name
       const cases = await prisma.patientCase.findMany({
         where: { zone, status: "WAITING" },
         orderBy: { priority: "desc" },
         include: { patient: true },
       });
-      queues[zone] = cases;
+
+      queues[zone] = {
+        cases,
+        count: cases.length,
+      };
     }
-    return res
-      .status(200)
-      .json({ message: "Queues fetched successfully", data: queues });
+
+    return res.status(200).json({
+      message: "Waiting queues fetched successfully",
+      data: queues,
+    });
   } catch (error) {
-    console.error("Error fetching queues:", error);
+    console.error("Error fetching waiting queues:", error);
     return res.status(500).json({ message: error.message });
   }
 };
@@ -148,14 +153,19 @@ export const getTreatmentQueues = async (req, res) => {
         orderBy: { priority: "desc" },
         include: { patient: true },
       });
-      treatmentQueues[zone] = cases;
+
+      treatmentQueues[zone] = {
+        cases,
+        count: cases.length,
+        capacity: TreatmentCapacity[zone],
+        available: TreatmentCapacity[zone] - cases.length,
+      };
     }
-    return res
-      .status(200)
-      .json({
-        message: "Treatment queues fetched successfully",
-        data: treatmentQueues,
-      });
+
+    return res.status(200).json({
+      message: "Treatment queues fetched successfully",
+      data: treatmentQueues,
+    });
   } catch (error) {
     console.error("Error fetching treatment queues:", error);
     return res.status(500).json({ message: error.message });
@@ -344,6 +354,33 @@ export const getTreatmentQueueStatus = async (req, res) => {
   }
 };
 
+export const getWaitingQueueStatus = async (req, res) => {
+  try {
+    const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
+    const queueStatus = {};
+
+    for (const zone of zones) {
+      const waitingCount = await prisma.patientCase.count({
+        where: {
+          zone: zone,
+          status: "WAITING",
+        },
+      });
+
+      queueStatus[zone] = {
+        waitingCount,
+      };
+    }
+
+    return res.status(200).json({
+      message: "Waiting queue status fetched successfully",
+      data: queueStatus,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 export const recalculateAllPriorities = async () => {
   try {
     console.log("Starting priority recalculation...");
@@ -382,14 +419,15 @@ export const recalculateAllPriorities = async () => {
 };
 
 export const startPriorityScheduler = () => {
-  cron.schedule("*/10 * * * *", () => {
+  const minutes = 1;
+  cron.schedule(`*/${minutes} * * * *`, () => {
     console.log("Running scheduled priority recalculation...");
+    autoDischargeCompletedTreatments();
     recalculateAllPriorities();
-
     fillTreatmentSlots();
   });
 
-  console.log("Priority scheduler started - will run every 5 minutes");
+  console.log(`Priority scheduler started - will run every ${minutes} minutes`);
 };
 
 export const triggerFillTreatmentSlots = async (req, res) => {
@@ -402,6 +440,70 @@ export const triggerFillTreatmentSlots = async (req, res) => {
     }
   } catch (error) {
     console.error("Error triggering fill treatment slots:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const autoDischargeCompletedTreatments = async () => {
+  try {
+    console.log("Starting auto-discharge of completed treatments...");
+    const inTreatmentCases = await prisma.patientCase.findMany({
+      where: {
+        status: "IN_TREATMENT",
+        treatment_duration: { not: null },
+      },
+    });
+
+    const currentTime = new Date();
+    let discharged = 0;
+
+    for (const patientCase of inTreatmentCases) {
+      const treatmentStartTime = patientCase.last_eval_time;
+      // When treatment started
+      const treatmentEndTime = new Date(
+        treatmentStartTime.getTime() + patientCase.treatment_duration * 60000 // Convert minutes to milliseconds
+      );
+
+      // If treatment time has passed, auto-discharge
+      if (currentTime >= treatmentEndTime) {
+        await prisma.patientCase.update({
+          where: { id: patientCase.id },
+          data: {
+            status: "DISCHARGED",
+            time_served: currentTime,
+            last_eval_time: currentTime,
+          },
+        });
+
+        console.log(
+          `Auto-discharged patient ${patientCase.id} after ${patientCase.treatment_duration} minutes of treatment`
+        );
+        discharged++;
+      }
+    }
+
+    if (discharged > 0) {
+      console.log(`Auto-discharged ${discharged} patients`);
+      // Fill newly available treatment slots
+      await fillTreatmentSlots();
+    }
+
+    return { success: true, discharged };
+  } catch (error) {
+    console.error("Error in auto-discharge:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const triggerAutoDischarge = async (req, res) => {
+  try {
+    const result = await autoDischargeCompletedTreatments();
+    return res.status(200).json({
+      message: `Auto-discharge completed. ${result.discharged} patients discharged.`,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error triggering auto-discharge:", error);
     return res.status(500).json({ message: error.message });
   }
 };
