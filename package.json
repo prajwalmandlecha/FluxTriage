@@ -1,0 +1,23 @@
+{
+  "name": "triagebackend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.16.2",
+    "express": "^5.1.0",
+    "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.16.2"
+  }
+}

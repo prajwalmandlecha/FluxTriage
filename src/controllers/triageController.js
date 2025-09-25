@@ -1,0 +1,407 @@
+import prisma from "../lib/prisma.js";
+import cron from "node-cron";
+
+const assignZone = (news2, si) => {
+  if (news2 >= 7 || si === 4) return "RED";
+  if (news2 >= 5 || si === 3) return "ORANGE";
+  if (news2 >= 3 || si === 2) return "YELLOW";
+  return "GREEN";
+};
+
+const Zones = {
+  RED: { wNEWS2: 0.4, wSI: 0.3, wT: 0.0, wR: 0.2, wA: 0.1 },
+  ORANGE: { wNEWS2: 0.35, wSI: 0.25, wT: 0.05, wR: 0.25, wA: 0.1 },
+  YELLOW: { wNEWS2: 0.25, wSI: 0.2, wT: 0.15, wR: 0.3, wA: 0.1 },
+  GREEN: { wNEWS2: 0.1, wSI: 0.1, wT: 0.3, wR: 0.2, wA: 0.3 },
+};
+
+const TreatmentCapacity = {
+  RED: 5,
+  ORANGE: 8,
+  YELLOW: 10,
+  GREEN: 15,
+};
+
+const checkZoneCapacity = async (zone) => {
+  const currentInTreatment = await prisma.patientCase.count({
+    where: {
+      zone: zone,
+      status: "IN_TREATMENT",
+    },
+  });
+
+  return currentInTreatment < TreatmentCapacity[zone];
+};
+
+const calculatePriority = (
+  zone,
+  news2,
+  si,
+  resourceScore,
+  ageFactor,
+  arrivalTime
+) => {
+  const currentTime = new Date();
+  const minutesWaited = Math.floor(
+    (currentTime.getTime() - arrivalTime.getTime()) / 60000
+  );
+  const timeFactor = Math.min(4, Math.floor(minutesWaited));
+  const { wNEWS2, wSI, wT, wR, wA } = Zones[zone];
+  return (
+    wNEWS2 * news2 +
+    wSI * si +
+    wT * timeFactor +
+    wR * resourceScore +
+    wA * ageFactor
+  );
+};
+
+export const createCase = async (req, res) => {
+  try {
+    const { id, news2, si, resourceScore, age, disease_code } = req.body;
+
+    if (!id || !news2 || !si || !resourceScore || !age) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const ageInt = parseInt(age);
+    if (isNaN(ageInt) || ageInt < 0) {
+      return res.status(400).json({ message: "Invalid age value" });
+    }
+
+    const zone = assignZone(news2, si);
+    const arrival = new Date();
+    const ageFactor = ageInt >= 65 || ageInt <= 15 ? 1 : 0;
+
+    const priority = calculatePriority(
+      zone,
+      news2,
+      si,
+      resourceScore,
+      ageFactor,
+      arrival
+    );
+
+    const patient = await prisma.patient.findUnique({
+      where: { id },
+    });
+
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+
+    const newCase = await prisma.patientCase.create({
+      data: {
+        patient_id: id,
+        news2,
+        si,
+        resource_score: resourceScore,
+        age: ageInt,
+        arrival_time: arrival,
+        last_eval_time: arrival,
+        zone,
+        priority,
+        disease_code,
+      },
+    });
+
+    await recalculateAllPriorities();
+
+    return res.json({ message: "Case created successfully", data: newCase });
+  } catch (error) {
+    console.error("Error creating case:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getWaitingQueues = async (req, res) => {
+  try {
+    const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
+    const queues = {};
+
+    for (const zone of zones) {
+      // Fix: Use correct model name
+      const cases = await prisma.patientCase.findMany({
+        where: { zone, status: "WAITING" },
+        orderBy: { priority: "desc" },
+        include: { patient: true },
+      });
+      queues[zone] = cases;
+    }
+    return res
+      .status(200)
+      .json({ message: "Queues fetched successfully", data: queues });
+  } catch (error) {
+    console.error("Error fetching queues:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getTreatmentQueues = async (req, res) => {
+  try {
+    const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
+    const treatmentQueues = {};
+
+    for (const zone of zones) {
+      const cases = await prisma.patientCase.findMany({
+        where: { zone, status: "IN_TREATMENT" },
+        orderBy: { priority: "desc" },
+        include: { patient: true },
+      });
+      treatmentQueues[zone] = cases;
+    }
+    return res
+      .status(200)
+      .json({
+        message: "Treatment queues fetched successfully",
+        data: treatmentQueues,
+      });
+  } catch (error) {
+    console.error("Error fetching treatment queues:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const sendToTreatment = async (req, res) => {
+  try {
+    const { caseId } = req.body;
+    if (!caseId) {
+      return res.status(400).json({ message: "caseId is required" });
+    }
+
+    const patientCase = await prisma.patientCase.findUnique({
+      where: { id: caseId },
+    });
+
+    if (!patientCase) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    const isZoneAvailable = await checkZoneCapacity(patientCase.zone);
+
+    if (!isZoneAvailable) {
+      return res.status(400).json({
+        message: `No available treatment slots in ${patientCase.zone} zone`,
+      });
+    }
+
+    const disease = await prisma.disease.findUnique({
+      where: { code: patientCase.disease_code || "" },
+    });
+
+    let treatmentDuration = 30;
+    if (disease && disease.treatment_time) {
+      treatmentDuration = disease.treatment_time;
+    }
+
+    const updatedCase = await prisma.patientCase.update({
+      where: { id: caseId },
+      data: {
+        status: "IN_TREATMENT",
+        treatment_duration: treatmentDuration,
+        last_eval_time: new Date(),
+      },
+    });
+
+    await recalculateAllPriorities();
+
+    return res
+      .status(200)
+      .json({ message: "Case sent to treatment", data: updatedCase });
+  } catch (error) {
+    console.error("Error sending case to treatment:", error);
+
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const dischargePatient = async (req, res) => {
+  try {
+    const { caseId } = req.body;
+    if (!caseId) {
+      return res.status(400).json({ message: "caseId is required" });
+    }
+
+    const patientCase = await prisma.patientCase.findUnique({
+      where: { id: caseId },
+    });
+
+    if (!patientCase) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    const updatedCase = await prisma.patientCase.update({
+      where: { id: caseId },
+      data: {
+        status: "DISCHARGED",
+        time_served: new Date(),
+        last_eval_time: new Date(),
+      },
+    });
+
+    await fillTreatmentSlots();
+
+    return res.status(200).json({
+      message: "Patient discharged, treatment slots filled",
+      data: updatedCase,
+    });
+  } catch (error) {
+    console.error("Error discharging patient:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const fillTreatmentSlots = async () => {
+  try {
+    const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
+
+    for (const zone of zones) {
+      const currentInTreatment = await prisma.patientCase.count({
+        where: {
+          zone: zone,
+          status: "IN_TREATMENT",
+        },
+      });
+
+      const availableSlots = TreatmentCapacity[zone] - currentInTreatment;
+
+      if (availableSlots <= 0) {
+        console.log(`No available slots in ${zone} zone`);
+        continue;
+      }
+
+      console.log(`Filling ${availableSlots} available slots in ${zone} zone`);
+
+      // Get top waiting cases for this zone
+      const topCases = await prisma.patientCase.findMany({
+        where: {
+          zone: zone,
+          status: "WAITING",
+        },
+        orderBy: { priority: "desc" },
+        take: availableSlots,
+      });
+
+      // Process each case
+      for (const patientCase of topCases) {
+        const disease = await prisma.disease.findUnique({
+          where: { code: patientCase.disease_code || "" },
+        });
+
+        let treatmentDuration = 30;
+        if (disease && disease.treatment_time) {
+          treatmentDuration = disease.treatment_time;
+        }
+
+        await prisma.patientCase.update({
+          where: { id: patientCase.id },
+          data: {
+            status: "IN_TREATMENT",
+            treatment_duration: treatmentDuration,
+            last_eval_time: new Date(),
+          },
+        });
+
+        console.log(`Case ${patientCase.id} sent to treatment in ${zone} zone`);
+      }
+    }
+
+    return { success: true, message: "Treatment slots filled successfully" };
+  } catch (error) {
+    console.error("Error filling treatment slots:", error);
+
+    return { success: false, message: error.message };
+  }
+};
+
+export const getTreatmentQueueStatus = async (req, res) => {
+  try {
+    const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
+    const queueStatus = {};
+
+    for (const zone of zones) {
+      const currentInTreatment = await prisma.patientCase.count({
+        where: {
+          zone: zone,
+          status: "IN_TREATMENT",
+        },
+      });
+
+      queueStatus[zone] = {
+        currentInTreatment,
+        maxCapacity: TreatmentCapacity[zone],
+        availableSlots: TreatmentCapacity[zone] - currentInTreatment,
+        isAtCapacity: currentInTreatment >= TreatmentCapacity[zone],
+      };
+    }
+
+    return res.status(200).json({
+      message: "Treatment queue status fetched successfully",
+      data: queueStatus,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const recalculateAllPriorities = async () => {
+  try {
+    console.log("Starting priority recalculation...");
+
+    const waitingCases = await prisma.patientCase.findMany({
+      where: { status: "WAITING" },
+    });
+
+    const currentTime = new Date();
+
+    for (const patientCase of waitingCases) {
+      const ageFactor = patientCase.age >= 65 || patientCase.age <= 15 ? 1 : 0;
+
+      const newPriority = calculatePriority(
+        patientCase.zone,
+        patientCase.news2,
+        patientCase.si,
+        patientCase.resource_score,
+        ageFactor,
+        patientCase.arrival_time
+      );
+
+      await prisma.patientCase.update({
+        where: { id: patientCase.id },
+        data: {
+          priority: newPriority,
+          last_eval_time: currentTime,
+        },
+      });
+    }
+
+    console.log(`Recalculated priorities for ${waitingCases.length} cases`);
+  } catch (error) {
+    console.error("Error recalculating priorities:", error);
+  }
+};
+
+export const startPriorityScheduler = () => {
+  cron.schedule("*/10 * * * *", () => {
+    console.log("Running scheduled priority recalculation...");
+    recalculateAllPriorities();
+
+    fillTreatmentSlots();
+  });
+
+  console.log("Priority scheduler started - will run every 5 minutes");
+};
+
+export const triggerFillTreatmentSlots = async (req, res) => {
+  try {
+    const result = await fillTreatmentSlots();
+    if (result.success) {
+      return res.status(200).json({ message: result.message });
+    } else {
+      return res.status(500).json({ message: result.message });
+    }
+  } catch (error) {
+    console.error("Error triggering fill treatment slots:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};

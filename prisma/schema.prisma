@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Patient{
+  id String @id @default(cuid())
+  name String
+  age Int
+  gender Gender
+  phone String 
+  email String?
+  medical_history Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  cases PatientCase[] @relation("PatientToCases")
+}
+
+model PatientCase {
+  id                    String       @id @default(cuid())
+  zone                  Zone
+  si                    Int          // Severity Index (1–4)
+  news2                 Int          // NEWS2 Score (0–20)
+  resource_score        Float
+  age                   Int
+  
+  priority              Float
+  treatment_duration Int?  
+  status                CaseStatus   @default(WAITING)
+
+  //
+  arrival_time          DateTime
+  last_eval_time        DateTime
+  time_served           DateTime?
+
+  //
+  disease_code          String?      // e.g., ICD-10 code
+  disease              Disease?     @relation(fields: [disease_code], references: [code])
+
+  //
+  // assigned_bed          Beds?        @relation("BedToPatientCase")
+  //
+  patient_id            String
+  patient               Patient      @relation("PatientToCases", fields: [patient_id], references: [id])
+
+  @@index([zone, status])
+  @@index([patient_id])
+  @@index([time_served])
+}
+
+model Disease {
+  id             String @id @default(cuid())
+  code           String @unique  // e.g., "J18.9", "I21.9"
+  name           String
+  description    String?
+  treatment_time Int    // in minutes
+  max_wait_time  Int    // max acceptable wait (minutes)
+  severity       Int    // 1–4 or 1–5 scale
+  patientCases   PatientCase[] 
+}
+
+
+// model Beds {
+//   id String @id @default(cuid()) 
+//   bed_number String @unique
+//   zone Zone 
+//   case_id String? @unique  
+//   patient_case PatientCase? @relation("BedToPatientCase", fields: [case_id], references: [id])
+//   assigned_at DateTime? 
+// }
+
+
+enum CaseStatus {
+  WAITING
+  IN_TREATMENT
+  DISCHARGED
+  TRANSFERRED
+}
+
+enum Action {
+  ASSIGN_BED
+  RELEASE_BED
+  EXTEND_BED
+  OVERRIDE_PRIORITY
+}
+
+enum Zone {  
+  RED
+  ORANGE
+  YELLOW 
+  GREEN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
