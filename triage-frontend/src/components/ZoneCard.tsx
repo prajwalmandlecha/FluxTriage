@@ -80,51 +80,61 @@ const PatientCard: React.FC<{
 
   return (
     <div
-      className={`p-4 rounded-lg border-2 ${config.borderColor} ${config.bgColor} transition-all hover:shadow-md`}
+      className={`p-5 rounded-xl border-2 ${config.borderColor} ${config.bgColor} transition-all hover:shadow-xl hover:scale-[1.02] shadow-md`}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
           <div
-            className={`w-10 h-10 rounded-full ${config.badgeColor} flex items-center justify-center`}
+            className={`w-12 h-12 rounded-xl ${config.badgeColor} flex items-center justify-center shadow-md`}
           >
-            <User className="w-5 h-5 text-white" />
+            <User className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h4 className={`font-semibold ${config.textColor}`}>
+            <h4 className={`font-bold text-base ${config.textColor}`}>
               {patientCase.patient.name}
             </h4>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 font-medium">
               {patientCase.patient.age}y, {patientCase.patient.gender}
             </p>
           </div>
         </div>
         <div
-          className={`px-2 py-1 rounded text-xs font-medium ${config.badgeColor} text-white`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold ${config.badgeColor} text-white shadow-sm`}
         >
           Priority: {patientCase.priority.toFixed(1)}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
-        <div>
-          <span className="font-medium text-gray-700">NEWS2:</span>
-          <span className={`ml-1 ${config.textColor}`}>
+      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+        <div className="bg-white/50 p-2 rounded-lg">
+          <span className="font-semibold text-gray-700 block text-xs mb-0.5">
+            NEWS2:
+          </span>
+          <span className={`text-lg font-bold ${config.textColor}`}>
             {patientCase.news2}
           </span>
         </div>
-        <div>
-          <span className="font-medium text-gray-700">SI:</span>
-          <span className={`ml-1 ${config.textColor}`}>{patientCase.si}</span>
+        <div className="bg-white/50 p-2 rounded-lg">
+          <span className="font-semibold text-gray-700 block text-xs mb-0.5">
+            SI:
+          </span>
+          <span className={`text-lg font-bold ${config.textColor}`}>
+            {patientCase.si}
+          </span>
         </div>
-        <div>
-          <span className="font-medium text-gray-700">Resource:</span>
-          <span className={`ml-1 ${config.textColor}`}>
+        <div className="bg-white/50 p-2 rounded-lg">
+          <span className="font-semibold text-gray-700 block text-xs mb-0.5">
+            Resource:
+          </span>
+          <span className={`text-lg font-bold ${config.textColor}`}>
             {patientCase.resource_score}
           </span>
         </div>
-        <div>
-          <span className="font-medium text-gray-700">Status:</span>
-          <span className={`ml-1 ${config.textColor}`}>
+        <div className="bg-white/50 p-2 rounded-lg">
+          <span className="font-semibold text-gray-700 block text-xs mb-0.5">
+            Status:
+          </span>
+          <span className={`text-xs font-bold ${config.textColor}`}>
             {patientCase.status}
           </span>
         </div>
@@ -146,8 +156,8 @@ const PatientCard: React.FC<{
       {type === "waiting" && onSendToTreatment && (
         <button
           onClick={() => onSendToTreatment(patientCase.id)}
-          className={`w-full py-2 px-4 rounded-md text-white font-medium transition-colors
-            ${config.badgeColor} hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2`}
+          className={`w-full py-3 px-4 rounded-lg text-white font-bold transition-all shadow-md hover:shadow-lg
+            ${config.badgeColor} hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 transform hover:scale-105`}
         >
           Send to Treatment
         </button>
@@ -156,8 +166,8 @@ const PatientCard: React.FC<{
       {type === "treatment" && onDischarge && (
         <button
           onClick={() => onDischarge(patientCase.id)}
-          className="w-full py-2 px-4 rounded-md bg-gray-600 text-white font-medium hover:bg-gray-700 
-                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+          className="w-full py-3 px-4 rounded-lg bg-gray-600 text-white font-bold hover:bg-gray-700 
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
         >
           Discharge Patient
         </button>
@@ -178,41 +188,43 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
 
   return (
     <div
-      className={`rounded-xl border-2 ${config.borderColor} ${config.bgColor} overflow-hidden shadow-sm`}
+      className={`rounded-2xl border-2 ${config.borderColor} ${config.bgColor} overflow-hidden shadow-xl hover:shadow-2xl transition-all hover:scale-[1.02]`}
     >
       {/* Header */}
       <div className={`p-6 ${config.badgeColor} text-white`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <IconComponent className="w-8 h-8" />
+          <div className="flex items-center space-x-4">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <IconComponent className="w-8 h-8" />
+            </div>
             <div>
-              <h3 className="text-xl font-bold">{zone} ZONE</h3>
-              <p className="text-sm opacity-90">{config.label}</p>
+              <h3 className="text-2xl font-bold">{zone} ZONE</h3>
+              <p className="text-sm opacity-90 font-medium">{config.label}</p>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold">{data.count}</div>
-            <div className="text-sm opacity-90">
+          <div className="text-right bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2">
+            <div className="text-4xl font-bold">{data.count}</div>
+            <div className="text-xs opacity-90 font-medium">
               {type === "waiting" ? "Waiting" : "In Treatment"}
             </div>
           </div>
         </div>
 
         {type === "treatment" && data.capacity && (
-          <div className="mt-4 bg-white bg-opacity-20 rounded-lg p-3">
-            <div className="flex justify-between text-sm mb-1">
+          <div className="mt-4 bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex justify-between text-sm mb-2 font-semibold">
               <span>Capacity</span>
-              <span>
+              <span className="text-lg font-bold">
                 {data.count}/{data.capacity}
               </span>
             </div>
-            <div className="w-full bg-white bg-opacity-30 rounded-full h-2">
+            <div className="w-full bg-white bg-opacity-30 rounded-full h-3">
               <div
-                className="bg-white h-2 rounded-full transition-all duration-300"
+                className="bg-white h-3 rounded-full transition-all duration-300 shadow-sm"
                 style={{ width: `${(data.count / data.capacity) * 100}%` }}
               />
             </div>
-            <div className="text-xs mt-1 opacity-90">
+            <div className="text-sm mt-2 opacity-90 font-medium">
               {data.available} slots available
             </div>
           </div>
@@ -222,12 +234,14 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
       {/* Cases List */}
       <div className="p-6">
         {data.cases.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <IconComponent className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No patients in {type === "waiting" ? "queue" : "treatment"}</p>
+          <div className="text-center py-12 text-gray-500">
+            <IconComponent className="w-16 h-16 mx-auto mb-4 opacity-30" />
+            <p className="text-base font-medium">
+              No patients in {type === "waiting" ? "queue" : "treatment"}
+            </p>
           </div>
         ) : (
-          <div className="space-y-4 max-h-96 overflow-y-auto">
+          <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {data.cases.map((patientCase) => (
               <PatientCard
                 key={patientCase.id}

@@ -146,7 +146,8 @@ function App() {
   };
 
   const getTotalCounts = () => {
-    if (!waitingQueues || !treatmentQueues) return { waiting: 0, treatment: 0 };
+    if (!waitingQueues || !treatmentQueues)
+      return { waiting: 0, treatment: 0, total: 0 };
 
     const waiting = Object.values(waitingQueues.data).reduce(
       (sum, zone) => sum + zone.count,
@@ -157,64 +158,77 @@ function App() {
       0
     );
 
-    return { waiting, treatment };
+    return { waiting, treatment, total: waiting + treatment };
   };
 
-  const { waiting: totalWaiting, treatment: totalTreatment } = getTotalCounts();
+  const {
+    waiting: totalWaiting,
+    treatment: totalTreatment,
+    total: totalPatients,
+  } = getTotalCounts();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Activity className="w-6 h-6 text-white" />
+      <header className="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg border-b border-blue-800">
+        <div className="max-w-[1920px] mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="flex items-center justify-between h-20">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                  <Activity className="w-8 h-8 text-blue-600" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">
+                  <h1 className="text-2xl font-bold text-white">
                     Hospital Triage System
                   </h1>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-blue-100">
                     Real-time patient queue management
                   </p>
                 </div>
               </div>
 
               {/* Stats */}
-              <div className="hidden md:flex items-center space-x-6 ml-8">
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-yellow-500" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Waiting: {totalWaiting}
-                  </span>
+              <div className="hidden lg:flex items-center space-x-8 ml-12">
+                <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-lg">
+                  <Clock className="w-6 h-6 text-yellow-300" />
+                  <div>
+                    <p className="text-xs text-blue-100">Waiting</p>
+                    <p className="text-lg font-bold text-white">
+                      {totalWaiting}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Activity className="w-5 h-5 text-green-500" />
-                  <span className="text-sm font-medium text-gray-700">
-                    In Treatment: {totalTreatment}
-                  </span>
+                <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-lg">
+                  <Activity className="w-6 h-6 text-green-300" />
+                  <div>
+                    <p className="text-xs text-blue-100">In Treatment</p>
+                    <p className="text-lg font-bold text-white">
+                      {totalTreatment}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-blue-500" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Patients: {patients.length}
-                  </span>
+                <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-lg">
+                  <Users className="w-6 h-6 text-purple-300" />
+                  <div>
+                    <p className="text-xs text-blue-100">Total Patients</p>
+                    <p className="text-lg font-bold text-white">
+                      {totalPatients}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {/* Auto-refresh toggle */}
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
+                className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-lg
                   ${
                     autoRefresh
-                      ? "bg-green-100 text-green-700 hover:bg-green-200"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-green-500 text-white hover:bg-green-600"
+                      : "bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm"
                   }`}
               >
                 <RefreshCw
@@ -228,18 +242,18 @@ function App() {
               {/* Action buttons */}
               <button
                 onClick={() => setShowCreatePatient(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className="flex items-center space-x-2 px-5 py-2.5 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-all font-semibold shadow-lg hover:shadow-xl"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
                 <span className="hidden sm:inline">New Patient</span>
               </button>
 
               <button
                 onClick={() => setShowCreateCase(true)}
                 disabled={patients.length === 0}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center space-x-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl"
               >
-                <AlertTriangle className="w-4 h-4" />
+                <AlertTriangle className="w-5 h-5" />
                 <span className="hidden sm:inline">New Case</span>
               </button>
             </div>
@@ -249,36 +263,38 @@ function App() {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
-          <div className="flex items-center">
-            <AlertTriangle className="w-5 h-5 text-red-400 mr-3" />
-            <p className="text-red-700">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-600"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-            </button>
+        <div className="max-w-[1920px] mx-auto px-6 sm:px-8 lg:px-12 pt-6">
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow-md">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-red-400 mr-3" />
+              <p className="text-red-700 font-medium">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="ml-auto text-red-400 hover:text-red-600 transition-colors"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-[1920px] mx-auto px-6 sm:px-8 lg:px-12 py-8">
         {/* Quick actions */}
-        <div className="mb-8 flex flex-wrap gap-4">
+        <div className="mb-8 flex flex-wrap gap-4 items-center bg-white p-6 rounded-xl shadow-md">
           <button
             onClick={fetchData}
             disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="flex items-center space-x-2 px-5 py-2.5 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-all font-medium shadow-sm hover:shadow-md"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <span>Refresh Now</span>
           </button>
 
           <button
             onClick={handleFillSlots}
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="flex items-center space-x-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium shadow-sm hover:shadow-md"
           >
             <Settings className="w-4 h-4" />
             <span>Fill Treatment Slots</span>
@@ -286,31 +302,39 @@ function App() {
 
           <button
             onClick={handleAutoDischarge}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+            className="flex items-center space-x-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all font-medium shadow-sm hover:shadow-md"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Auto Discharge</span>
           </button>
 
-          <div className="ml-auto text-sm text-gray-500">
-            Last updated: {lastUpdate.toLocaleTimeString()}
+          <div className="ml-auto text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+            <span className="font-medium">Last updated:</span>{" "}
+            {lastUpdate.toLocaleTimeString()}
           </div>
         </div>
 
         {loading && !waitingQueues && !treatmentQueues ? (
-          <div className="flex items-center justify-center h-64">
-            <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-            <span className="ml-3 text-gray-600">Loading triage data...</span>
+          <div className="flex items-center justify-center h-64 bg-white rounded-xl shadow-md">
+            <RefreshCw className="w-10 h-10 animate-spin text-blue-500" />
+            <span className="ml-4 text-lg text-gray-700 font-medium">
+              Loading triage data...
+            </span>
           </div>
         ) : (
-          <div className="space-y-12">
+          <div className="space-y-10">
             {/* Waiting Queues */}
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <Clock className="w-6 h-6 mr-3 text-yellow-500" />
-                Waiting Queues ({totalWaiting} patients)
-              </h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+              <div className="bg-gradient-to-r from-yellow-500 to-orange-500 p-6 rounded-xl shadow-lg mb-6">
+                <h2 className="text-3xl font-bold text-white flex items-center">
+                  <Clock className="w-8 h-8 mr-4" />
+                  Waiting Queues
+                  <span className="ml-4 bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-xl">
+                    {totalWaiting} patients
+                  </span>
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
                 {waitingQueues &&
                   Object.entries(waitingQueues.data).map(([zone, data]) => (
                     <ZoneCard
@@ -326,11 +350,16 @@ function App() {
 
             {/* Treatment Queues */}
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <Activity className="w-6 h-6 mr-3 text-green-500" />
-                Treatment Queues ({totalTreatment} patients)
-              </h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-xl shadow-lg mb-6">
+                <h2 className="text-3xl font-bold text-white flex items-center">
+                  <Activity className="w-8 h-8 mr-4" />
+                  Treatment Queues
+                  <span className="ml-4 bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-xl">
+                    {totalTreatment} patients
+                  </span>
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
                 {treatmentQueues &&
                   Object.entries(treatmentQueues.data).map(([zone, data]) => (
                     <ZoneCard
