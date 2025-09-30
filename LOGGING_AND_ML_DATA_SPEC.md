@@ -140,9 +140,9 @@
 - On patient arrival
 - On escalation (max_wait_time exceeded)
 - On treatment/discharge
-## 2. Data Required by the ML / ETL Pipeline
 
-### A. Raw Input (Read from Logs)
+
+## 2. Data Required by the ML / ETL Pipeline
 
 | Field                   | Type      | Use                         |
 |-------------------------|-----------|-----------------------------|
@@ -159,18 +159,3 @@
 | sex                     | VARCHAR   | Optional for fairness audit |
 | vitals.heart_rate, etc. | INTEGER   | Engineer trends if needed   |
 
-
-### B. Derived Columns (Created in ETL, Not Stored)
-
-| Derived Name         | Formula                                         | Type   | Output to ML                |
-|----------------------|-------------------------------------------------|--------|-----------------------------|
-| days_old             | floor((today_date - timestamp_date) / 1 day)    | INT    | Decay calc                  |
-| sample_weight        | 2^(-days_old / 7)                               | FLOAT  | Row weight for GBM & opt    |
-| ageFactor            | 1 if age ≤ 15 OR age ≥ 65 else 0                | INT    | Feature                     |
-| disease_group        | Collapse ICD to 15 clinical groups              | VARCHAR| Categorical feature         |
-| breach_label         | current_wait_time > max_wait_time               | BOOLEAN| Target for GBM              |
-| breach_30min_label   | Will breach within 30 min (see note)            | BOOLEAN| Target for opt              |
-| hour_of_day          | extract(timestamp)                              | INT    | Calendar feature            |
-
-**Note on breach_30min_label:**  
-`breach_in_next_30min = (any future row for same case within 30 min has breach_label == True)`
