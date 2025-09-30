@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { X, Activity, AlertCircle, Users, TrendingUp } from "lucide-react";
+import {
+  X,
+  Activity,
+  AlertCircle,
+  Users,
+  TrendingUp,
+  Thermometer,
+  Heart,
+  Wind,
+  Droplet,
+} from "lucide-react";
 import { CreateCaseData, Patient } from "../types";
 
 interface CreateCaseModalProps {
@@ -19,26 +29,84 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<CreateCaseData>({
     id: "",
-    news2: 0,
     si: 1,
     resourceScore: 1.0,
     age: 0,
+    vitals: {
+      respiratory_rate: 16,
+      oxygen_saturation: 98,
+      supplemental_oxygen: false,
+      temperature: 37.0,
+      systolic_bp: 120,
+      heart_rate: 75,
+      consciousness_level: "ALERT",
+    },
   });
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [predictedZone, setPredictedZone] = useState<string>("");
+  const [calculatedNEWS2, setCalculatedNEWS2] = useState<number>(0);
 
-  // Predict zone based on NEWS2 and SI
+  const calculateLocalNEWS2 = (vitals: CreateCaseData["vitals"]): number => {
+    let score = 0;
+
+    if (vitals.respiratory_rate <= 8) score += 3;
+    else if (vitals.respiratory_rate <= 11) score += 1;
+    else if (vitals.respiratory_rate <= 20) score += 0;
+    else if (vitals.respiratory_rate <= 24) score += 2;
+    else score += 3;
+
+    if (vitals.supplemental_oxygen) {
+      score += 2;
+      if (vitals.oxygen_saturation <= 83) score += 3;
+      else if (vitals.oxygen_saturation <= 85) score += 2;
+      else if (vitals.oxygen_saturation <= 87) score += 1;
+      else if (vitals.oxygen_saturation <= 92) score += 0;
+      else if (vitals.oxygen_saturation <= 94) score += 1;
+      else if (vitals.oxygen_saturation <= 96) score += 2;
+      else score += 3;
+    } else {
+      if (vitals.oxygen_saturation <= 91) score += 3;
+      else if (vitals.oxygen_saturation <= 93) score += 2;
+      else if (vitals.oxygen_saturation <= 95) score += 1;
+    }
+
+    if (vitals.temperature <= 35.0) score += 3;
+    else if (vitals.temperature <= 36.0) score += 1;
+    else if (vitals.temperature <= 38.0) score += 0;
+    else if (vitals.temperature <= 39.0) score += 1;
+    else score += 2;
+
+    if (vitals.systolic_bp <= 90) score += 3;
+    else if (vitals.systolic_bp <= 100) score += 2;
+    else if (vitals.systolic_bp <= 110) score += 1;
+    else if (vitals.systolic_bp <= 219) score += 0;
+    else score += 3;
+
+    if (vitals.heart_rate <= 40) score += 3;
+    else if (vitals.heart_rate <= 50) score += 1;
+    else if (vitals.heart_rate <= 90) score += 0;
+    else if (vitals.heart_rate <= 110) score += 1;
+    else if (vitals.heart_rate <= 130) score += 2;
+    else score += 3;
+
+    if (vitals.consciousness_level !== "ALERT") score += 3;
+
+    return Math.min(20, Math.max(0, score));
+  };
+
+  // Predict zone based on computed NEWS2 and SI
   useEffect(() => {
-    const { news2, si } = formData;
-    let zone = "GREEN";
+    const news2 = calculateLocalNEWS2(formData.vitals);
+    setCalculatedNEWS2(news2);
 
-    if (news2 >= 7 || si === 4) zone = "RED";
-    else if (news2 >= 5 || si === 3) zone = "ORANGE";
-    else if (news2 >= 3 || si === 2) zone = "YELLOW";
+    let zone = "GREEN";
+    if (news2 >= 7 || formData.si === 4) zone = "RED";
+    else if (news2 >= 5 || formData.si === 3) zone = "ORANGE";
+    else if (news2 >= 3 || formData.si === 2) zone = "YELLOW";
 
     setPredictedZone(zone);
-  }, [formData.news2, formData.si]);
+  }, [formData.vitals, formData.si]);
 
   const handlePatientSelect = (patientId: string) => {
     const patient = patients.find((p) => p.id === patientId);
@@ -60,10 +128,18 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
   const handleClose = () => {
     setFormData({
       id: "",
-      news2: 0,
       si: 1,
       resourceScore: 1.0,
       age: 0,
+      vitals: {
+        respiratory_rate: 16,
+        oxygen_saturation: 98,
+        supplemental_oxygen: false,
+        temperature: 37.0,
+        systolic_bp: 120,
+        heart_rate: 75,
+        consciousness_level: "ALERT",
+      },
     });
     setSelectedPatient(null);
     onClose();
@@ -150,6 +226,211 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
             )}
           </div>
 
+          {/* Vital Signs */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <Activity className="w-5 h-5 inline mr-2" />
+              Vital Signs
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Respiratory Rate */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Wind className="w-4 h-4 inline mr-1" />
+                  Respiratory Rate * (breaths/min)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  max={60}
+                  value={formData.vitals.respiratory_rate}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vitals: {
+                        ...formData.vitals,
+                        respiratory_rate: parseInt(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., 16"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Normal: 12-20 breaths/min
+                </p>
+              </div>
+
+              {/* Oxygen Saturation */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Droplet className="w-4 h-4 inline mr-1" />
+                  Oxygen Saturation * (SpO2 %)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  max={100}
+                  value={formData.vitals.oxygen_saturation}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vitals: {
+                        ...formData.vitals,
+                        oxygen_saturation: parseInt(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., 98"
+                />
+                <p className="text-xs text-gray-500 mt-1">Normal: ≥96%</p>
+              </div>
+
+              {/* Supplemental Oxygen */}
+              <div className="md:col-span-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.vitals.supplemental_oxygen}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        vitals: {
+                          ...formData.vitals,
+                          supplemental_oxygen: e.target.checked,
+                        },
+                      })
+                    }
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Patient is on supplemental oxygen
+                  </span>
+                </label>
+              </div>
+
+              {/* Temperature */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Thermometer className="w-4 h-4 inline mr-1" />
+                  Temperature * (°C)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={30}
+                  max={45}
+                  step={0.1}
+                  value={formData.vitals.temperature}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vitals: {
+                        ...formData.vitals,
+                        temperature: parseFloat(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., 37.0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Normal: 36.1-38.0°C
+                </p>
+              </div>
+
+              {/* Systolic Blood Pressure */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Heart className="w-4 h-4 inline mr-1" />
+                  Systolic BP * (mmHg)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={40}
+                  max={300}
+                  value={formData.vitals.systolic_bp}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vitals: {
+                        ...formData.vitals,
+                        systolic_bp: parseInt(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., 120"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Normal: 111-219 mmHg
+                </p>
+              </div>
+
+              {/* Heart Rate */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Heart className="w-4 h-4 inline mr-1" />
+                  Heart Rate * (bpm)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={20}
+                  max={250}
+                  value={formData.vitals.heart_rate}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vitals: {
+                        ...formData.vitals,
+                        heart_rate: parseInt(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., 75"
+                />
+                <p className="text-xs text-gray-500 mt-1">Normal: 51-90 bpm</p>
+              </div>
+
+              {/* Consciousness Level */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <AlertCircle className="w-4 h-4 inline mr-1" />
+                  Consciousness Level * (AVPU)
+                </label>
+                <select
+                  required
+                  value={formData.vitals.consciousness_level}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vitals: {
+                        ...formData.vitals,
+                        consciousness_level: e.target.value as any,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="ALERT">A - Alert</option>
+                  <option value="VOICE">V - Responds to Voice</option>
+                  <option value="PAIN">P - Responds to Pain</option>
+                  <option value="UNRESPONSIVE">U - Unresponsive</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  AVPU scale assessment
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Clinical Assessment */}
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -157,31 +438,6 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <AlertCircle className="w-4 h-4 inline mr-1" />
-                  NEWS2 Score * (0-20)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  max="20"
-                  value={formData.news2}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      news2: parseInt(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="National Early Warning Score"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Physiological parameters assessment (0-20 scale)
-                </p>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Severity Index * (1-4)
@@ -233,27 +489,40 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
             </div>
           </div>
 
-          {/* Predicted Zone */}
+          {/* Predicted Zone & NEWS2 Score */}
           {predictedZone && (
             <div className="border-t pt-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 Triage Assessment
               </h3>
-              <div
-                className={`p-4 rounded-lg border-2 ${getZoneColor(
-                  predictedZone
-                )}`}
-              >
-                <div className="flex items-center space-x-3">
-                  <AlertCircle className="w-6 h-6" />
-                  <div>
-                    <h4 className="font-semibold">
-                      Predicted Zone: {predictedZone}
-                    </h4>
-                    <p className="text-sm opacity-80">
-                      Based on NEWS2 ({formData.news2}) and Severity Index (
-                      {formData.si})
-                    </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* NEWS2 Score */}
+                <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                  <div className="text-sm text-blue-800 font-medium">
+                    NEWS2 (preview): {calculatedNEWS2}
+                  </div>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Computed from entered vitals; final score is calculated on
+                    server
+                  </p>
+                </div>
+                {/* Zone */}
+                <div
+                  className={`p-4 rounded-lg border-2 ${getZoneColor(
+                    predictedZone
+                  )}`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <AlertCircle className="w-6 h-6" />
+                    <div>
+                      <h4 className="font-semibold">
+                        Predicted Zone: {predictedZone}
+                      </h4>
+                      <p className="text-sm opacity-80">
+                        Based on NEWS2 preview ({calculatedNEWS2}) and Severity
+                        Index ({formData.si})
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

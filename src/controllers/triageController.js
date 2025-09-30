@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import cron from "node-cron";
+import { calculateNEWS2, validateVitals } from "../lib/news2.js";
 
 const assignZone = (news2, si) => {
   if (news2 >= 7 || si === 4) return "RED";
@@ -58,10 +59,14 @@ const calculatePriority = (
 
 export const createCase = async (req, res) => {
   try {
-    const { id, news2, si, resourceScore, age, disease_code } = req.body;
+    const { id, si, resourceScore, age, disease_code, vitals } = req.body;
 
-    if (!id || !news2 || !si || !resourceScore || !age) {
+    if (!id || si == null || resourceScore == null || age == null) {
       return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (!validateVitals(vitals)) {
+      return res.status(400).json({ message: "Invalid or missing vitals" });
     }
 
     const ageInt = parseInt(age);
@@ -69,13 +74,14 @@ export const createCase = async (req, res) => {
       return res.status(400).json({ message: "Invalid age value" });
     }
 
-    const zone = assignZone(news2, si);
+    const computedNews2 = calculateNEWS2(vitals);
+    const zone = assignZone(computedNews2, si);
     const arrival = new Date();
     const ageFactor = ageInt >= 65 || ageInt <= 15 ? 1 : 0;
 
     const priority = calculatePriority(
       zone,
-      news2,
+      computedNews2,
       si,
       resourceScore,
       ageFactor,
@@ -93,10 +99,11 @@ export const createCase = async (req, res) => {
     const newCase = await prisma.patientCase.create({
       data: {
         patient_id: id,
-        news2,
+        news2: computedNews2,
         si,
         resource_score: resourceScore,
         age: ageInt,
+        vitals: vitals,
         arrival_time: arrival,
         last_eval_time: arrival,
         zone,

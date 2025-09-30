@@ -33,6 +33,7 @@ model PatientCase {
   news2                 Int          // NEWS2 Score (0–20)
   resource_score        Float
   age                   Int
+  vitals                Json?
   
   priority              Float
   treatment_duration Int?  

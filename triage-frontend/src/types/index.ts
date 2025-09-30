@@ -27,6 +27,7 @@ export interface PatientCase {
   news2: number;
   resource_score: number;
   age: number;
+  vitals?: any;
   priority: number;
   treatment_duration?: number;
   status: CaseStatus;
@@ -66,8 +67,16 @@ export interface CreatePatientData {
 
 export interface CreateCaseData {
   id: string;
-  news2: number;
   si: number;
   resourceScore: number;
   age: number;
+  vitals: {
+    respiratory_rate: number;
+    oxygen_saturation: number;
+    supplemental_oxygen: boolean;
+    temperature: number;
+    systolic_bp: number;
+    heart_rate: number;
+    consciousness_level: "ALERT" | "VOICE" | "PAIN" | "UNRESPONSIVE";
+  };
 }
