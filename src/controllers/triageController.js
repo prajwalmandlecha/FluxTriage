@@ -1,6 +1,13 @@
 import prisma from "../lib/prisma.js";
 import cron from "node-cron";
 import { calculateNEWS2, validateVitals } from "../lib/news2.js";
+import {
+  createCaseLog,
+  appendCaseUpdate,
+  ensureCaseLogForCase,
+  markTreatmentTimes,
+  setOutcomeAndTotals,
+} from "../lib/logging.js";
 
 const assignZone = (news2, si) => {
   if (news2 >= 7 || si === 4) return "RED";
@@ -112,6 +119,28 @@ export const createCase = async (req, res) => {
       },
     });
 
+    // Create initial log + update
+    const caseLog = await createCaseLog({
+      caseId: newCase.id,
+      patientId: id,
+      zone,
+      age: ageInt,
+      ageFactor,
+      arrivalTime: arrival,
+      diseaseCode: disease_code,
+    });
+    await appendCaseUpdate({
+      caseLogId: caseLog.id,
+      vitals,
+      news2: computedNews2,
+      si,
+      resourceScore,
+      priority,
+      waitingMinutes: 0,
+      rankInQueue: null,
+      status: "WAITING",
+    });
+
     await recalculateAllPriorities();
 
     return res.json({ message: "Case created successfully", data: newCase });
@@ -220,6 +249,37 @@ export const sendToTreatment = async (req, res) => {
       },
     });
 
+    // Log treatment start
+    const caseLog = await ensureCaseLogForCase({
+      caseId: updatedCase.id,
+      patientId: updatedCase.patient_id,
+      zone: updatedCase.zone,
+      age: updatedCase.age,
+      ageFactor: updatedCase.age >= 65 || updatedCase.age <= 15 ? 1 : 0,
+      arrivalTime: updatedCase.arrival_time,
+      diseaseCode: updatedCase.disease_code,
+    });
+    await markTreatmentTimes({
+      caseId: updatedCase.id,
+      startTime: updatedCase.last_eval_time,
+    });
+    const waitingMinutes = Math.floor(
+      (updatedCase.last_eval_time.getTime() -
+        updatedCase.arrival_time.getTime()) /
+        60000
+    );
+    await appendCaseUpdate({
+      caseLogId: caseLog.id,
+      vitals: updatedCase.vitals || {},
+      news2: updatedCase.news2,
+      si: updatedCase.si,
+      resourceScore: updatedCase.resource_score,
+      priority: updatedCase.priority,
+      waitingMinutes,
+      rankInQueue: null,
+      status: "IN_TREATMENT",
+    });
+
     await recalculateAllPriorities();
 
     return res
@@ -254,6 +314,22 @@ export const dischargePatient = async (req, res) => {
         time_served: new Date(),
         last_eval_time: new Date(),
       },
+    });
+
+    // Log treatment end and outcome
+    await markTreatmentTimes({
+      caseId: updatedCase.id,
+      endTime: updatedCase.last_eval_time,
+    });
+    const totalMinutes = Math.floor(
+      (updatedCase.last_eval_time.getTime() -
+        updatedCase.arrival_time.getTime()) /
+        60000
+    );
+    await setOutcomeAndTotals({
+      caseId: updatedCase.id,
+      outcome: "discharged",
+      totalTimeInMinutes: totalMinutes,
     });
 
     await fillTreatmentSlots();
@@ -416,6 +492,32 @@ export const recalculateAllPriorities = async () => {
           priority: newPriority,
           last_eval_time: currentTime,
         },
+      });
+
+      // Append periodic update log
+      const caseLog = await ensureCaseLogForCase({
+        caseId: patientCase.id,
+        patientId: patientCase.patient_id,
+        zone: patientCase.zone,
+        age: patientCase.age,
+        ageFactor,
+        arrivalTime: patientCase.arrival_time,
+        diseaseCode: patientCase.disease_code,
+      });
+      const waitingMinutes = Math.floor(
+        (currentTime.getTime() - patientCase.arrival_time.getTime()) / 60000
+      );
+      // Rank in queue is complex; optionally null for now
+      await appendCaseUpdate({
+        caseLogId: caseLog.id,
+        vitals: patientCase.vitals || {},
+        news2: patientCase.news2,
+        si: patientCase.si,
+        resourceScore: patientCase.resource_score,
+        priority: newPriority,
+        waitingMinutes,
+        rankInQueue: null,
+        status: patientCase.status,
       });
     }
 

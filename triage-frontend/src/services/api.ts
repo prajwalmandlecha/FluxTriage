@@ -4,6 +4,7 @@ import {
   CreatePatientData,
   CreateCaseData,
   Patient,
+  Disease,
 } from "../types";
 
 const API_BASE_URL = "http://localhost:3000/api";
@@ -40,6 +41,26 @@ export const triageApi = {
 
   fillTreatmentSlots: () => api.post("/triage/treatment/fill"),
   autoDischarge: () => api.post("/triage/discharge/allCompleted"),
+
+  // Disease endpoints
+  getDiseases: (params?: { severity?: number; search?: string }) =>
+    api.get<{ message: string; data: Disease[]; count: number }>("/diseases", {
+      params,
+    }),
+  getDiseaseByCode: (code: string) =>
+    api.get<{ message: string; data: Disease; activeCases: number }>(
+      `/diseases/${code}`
+    ),
+  getDiseaseStats: () =>
+    api.get<{
+      message: string;
+      data: Array<{
+        severity: number;
+        count: number;
+        avgTreatmentTime: number;
+        avgMaxWait: number;
+      }>;
+    }>("/diseases/stats"),
 };
 
 export default api;

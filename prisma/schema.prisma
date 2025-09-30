@@ -54,6 +54,9 @@ model PatientCase {
   patient_id            String
   patient               Patient      @relation("PatientToCases", fields: [patient_id], references: [id])
 
+  // Logs relation
+  logs                 CaseLog[]
+
   @@index([zone, status])
   @@index([patient_id])
   @@index([time_served])
@@ -106,4 +109,44 @@ enum Gender {
   MALE
   FEMALE
   OTHER
+}
+
+// Logging models
+model CaseLog {
+  id                    String       @id @default(cuid())
+  case_id               String
+  patient_case          PatientCase  @relation(fields: [case_id], references: [id])
+  patient_id            String
+  zone                  Zone
+  age                   Int
+  age_factor            Int
+  arrival_time          DateTime
+  disease_code          String?
+  treatment_start_time  DateTime?
+  treatment_end_time    DateTime?
+  total_time_in_ed      Int?
+  escalation            Boolean?     @default(false)
+  outcome               String?
+  created_at            DateTime     @default(now())
+  updates               CaseUpdate[]
+
+  @@index([case_id])
+  @@index([patient_id])
+}
+
+model CaseUpdate {
+  id              String   @id @default(cuid())
+  case_log_id     String
+  case_log        CaseLog  @relation(fields: [case_log_id], references: [id])
+  timestamp       DateTime @default(now())
+  vitals_json     Json
+  news2           Int
+  si              Int
+  resourceScore   Float
+  priority        Float
+  waiting_time    Int
+  rank_in_queue   Int?
+  status          CaseStatus
+
+  @@index([case_log_id])
 }

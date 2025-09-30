@@ -10,6 +10,7 @@ import {
   triggerAutoDischarge,
   getWaitingQueueStatus,
 } from "../controllers/triageController.js";
+import { getLogsByCase } from "../controllers/triageLogsController.js";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.post("/treatment", sendToTreatment);
 router.post("/discharge", dischargePatient);
 router.post("/discharge/allCompleted", triggerAutoDischarge);
 router.post("/treatment/fill", triggerFillTreatmentSlots);
+router.get("/logs/:caseId", getLogsByCase);
 
 export default router;

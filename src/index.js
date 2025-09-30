@@ -3,12 +3,13 @@ import cors from "cors";
 import triageRoutes from "./routes/triageRoutes.js";
 import { startPriorityScheduler } from "./controllers/triageController.js";
 import patientRoutes from "./routes/patientRoutes.js";
+import diseaseRoutes from "./routes/diseaseRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(
-  cors({  
+  cors({
     origin: ["http://localhost:3001", "http://127.0.0.1:3001"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -22,6 +23,7 @@ app.get("/health", (req, res) => res.send("OK"));
 
 app.use("/api/patients", patientRoutes);
 app.use("/api/triage", triageRoutes);
+app.use("/api/diseases", diseaseRoutes);
 
 startPriorityScheduler();
 

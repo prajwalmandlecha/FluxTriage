@@ -70,6 +70,7 @@ export interface CreateCaseData {
   si: number;
   resourceScore: number;
   age: number;
+  disease_code?: string;
   vitals: {
     respiratory_rate: number;
     oxygen_saturation: number;
@@ -79,4 +80,14 @@ export interface CreateCaseData {
     heart_rate: number;
     consciousness_level: "ALERT" | "VOICE" | "PAIN" | "UNRESPONSIVE";
   };
+}
+
+export interface Disease {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  treatment_time: number;
+  max_wait_time: number;
+  severity: number;
 }

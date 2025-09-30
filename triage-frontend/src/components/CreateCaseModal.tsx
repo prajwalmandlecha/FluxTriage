@@ -9,8 +9,11 @@ import {
   Heart,
   Wind,
   Droplet,
+  FileText,
+  Search,
 } from "lucide-react";
-import { CreateCaseData, Patient } from "../types";
+import { CreateCaseData, Patient, Disease } from "../types";
+import { triageApi } from "../services/api";
 
 interface CreateCaseModalProps {
   isOpen: boolean;
@@ -46,6 +49,13 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [predictedZone, setPredictedZone] = useState<string>("");
   const [calculatedNEWS2, setCalculatedNEWS2] = useState<number>(0);
+
+  // Disease selection state
+  const [diseases, setDiseases] = useState<Disease[]>([]);
+  const [diseaseSearch, setDiseaseSearch] = useState<string>("");
+  const [selectedDisease, setSelectedDisease] = useState<Disease | null>(null);
+  const [showDiseaseDropdown, setShowDiseaseDropdown] =
+    useState<boolean>(false);
 
   const calculateLocalNEWS2 = (vitals: CreateCaseData["vitals"]): number => {
     let score = 0;
@@ -95,6 +105,28 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
     return Math.min(20, Math.max(0, score));
   };
 
+  // Fetch diseases on component mount
+  useEffect(() => {
+    const fetchDiseases = async () => {
+      try {
+        const response = await triageApi.getDiseases();
+        setDiseases(response.data.data);
+      } catch (error) {
+        console.error("Error fetching diseases:", error);
+      }
+    };
+    fetchDiseases();
+  }, []);
+
+  // Filter diseases based on search
+  const filteredDiseases = diseases.filter(
+    (disease) =>
+      disease.name.toLowerCase().includes(diseaseSearch.toLowerCase()) ||
+      disease.code.toLowerCase().includes(diseaseSearch.toLowerCase()) ||
+      (disease.description &&
+        disease.description.toLowerCase().includes(diseaseSearch.toLowerCase()))
+  );
+
   // Predict zone based on computed NEWS2 and SI
   useEffect(() => {
     const news2 = calculateLocalNEWS2(formData.vitals);
@@ -125,6 +157,28 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
     onSubmit(formData);
   };
 
+  const handleDiseaseSelect = (disease: Disease) => {
+    setSelectedDisease(disease);
+    setFormData({
+      ...formData,
+      disease_code: disease.code,
+    });
+    setDiseaseSearch(disease.name);
+    setShowDiseaseDropdown(false);
+  };
+
+  const handleDiseaseSearchChange = (value: string) => {
+    setDiseaseSearch(value);
+    setShowDiseaseDropdown(true);
+    if (!value) {
+      setSelectedDisease(null);
+      setFormData({
+        ...formData,
+        disease_code: undefined,
+      });
+    }
+  };
+
   const handleClose = () => {
     setFormData({
       id: "",
@@ -142,6 +196,9 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
       },
     });
     setSelectedPatient(null);
+    setSelectedDisease(null);
+    setDiseaseSearch("");
+    setShowDiseaseDropdown(false);
     onClose();
   };
 
@@ -428,6 +485,145 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
                   AVPU scale assessment
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Disease/Condition Selection */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <FileText className="w-5 h-5 inline mr-2" />
+              Condition/Diagnosis (Optional)
+            </h3>
+
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Search className="w-4 h-4 inline mr-1" />
+                Search Disease/Condition
+              </label>
+              <input
+                type="text"
+                value={diseaseSearch}
+                onChange={(e) => handleDiseaseSearchChange(e.target.value)}
+                onFocus={() => setShowDiseaseDropdown(true)}
+                placeholder="Type to search by name or ICD-10 code..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+
+              {/* Disease Dropdown */}
+              {showDiseaseDropdown && diseaseSearch && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                  {filteredDiseases.length > 0 ? (
+                    filteredDiseases.slice(0, 10).map((disease) => (
+                      <button
+                        key={disease.id}
+                        type="button"
+                        onClick={() => handleDiseaseSelect(disease)}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">
+                              {disease.name}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              ICD-10: {disease.code}
+                            </div>
+                            {disease.description && (
+                              <div className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                {disease.description}
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-3 flex flex-col items-end text-xs">
+                            <span
+                              className={`px-2 py-1 rounded ${
+                                disease.severity === 1
+                                  ? "bg-red-100 text-red-700"
+                                  : disease.severity === 2
+                                  ? "bg-orange-100 text-orange-700"
+                                  : disease.severity === 3
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : disease.severity === 4
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-blue-100 text-blue-700"
+                              }`}
+                            >
+                              Severity {disease.severity}
+                            </span>
+                            <span className="text-gray-500 mt-1">
+                              ~{disease.treatment_time}min
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-gray-500">
+                      No diseases found matching "{diseaseSearch}"
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Selected Disease Info */}
+              {selectedDisease && (
+                <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="font-semibold text-blue-900">
+                        {selectedDisease.name}
+                      </div>
+                      <div className="text-sm text-blue-700 mt-1">
+                        ICD-10: {selectedDisease.code}
+                      </div>
+                      {selectedDisease.description && (
+                        <div className="text-sm text-blue-800 mt-2">
+                          {selectedDisease.description}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-4 mt-3 text-sm">
+                        <span className="text-blue-700">
+                          <strong>Treatment Time:</strong>{" "}
+                          {selectedDisease.treatment_time} minutes
+                        </span>
+                        <span className="text-blue-700">
+                          <strong>Max Wait:</strong>{" "}
+                          {selectedDisease.max_wait_time} minutes
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded text-xs ${
+                            selectedDisease.severity === 1
+                              ? "bg-red-100 text-red-700"
+                              : selectedDisease.severity === 2
+                              ? "bg-orange-100 text-orange-700"
+                              : selectedDisease.severity === 3
+                              ? "bg-yellow-100 text-yellow-700"
+                              : selectedDisease.severity === 4
+                              ? "bg-green-100 text-green-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          Severity Level {selectedDisease.severity}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDisease(null);
+                        setDiseaseSearch("");
+                        setFormData({
+                          ...formData,
+                          disease_code: undefined,
+                        });
+                      }}
+                      className="ml-3 text-blue-600 hover:text-blue-800"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
