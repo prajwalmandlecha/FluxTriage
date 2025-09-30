@@ -206,7 +206,7 @@ export const sendToTreatment = async (req, res) => {
       where: { code: patientCase.disease_code || "" },
     });
 
-    let treatmentDuration = 30;
+    let treatmentDuration = 1;
     if (disease && disease.treatment_time) {
       treatmentDuration = disease.treatment_time;
     }
