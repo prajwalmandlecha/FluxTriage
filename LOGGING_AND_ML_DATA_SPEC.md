@@ -12,7 +12,8 @@
 - `priority`: Computed priority score for triage
 - `age`: Patient's age
 - `sex`: Patient's sex
-- `vitals`: Object containing NEWS2, SI, heart_rate, bp_systolic, bp_diastolic, spo2, temperature
+- `SI`: Severity Index
+- `vitals`: Object containing NEWS2(calculated from vital signs), Respiratory rate, Oxygen saturations (and whether the patient is on air or O₂), Systolic BP, Pulse rate, Level of consciousness (AVPU), Temperature
 - `resource_score`: Calculated score representing resource needs
 - `max_wait_time`: Maximum permitted wait time for the assigned zone/disease
 - `current_wait_time`: Time patient has waited so far (includes patients currently under treatment)
@@ -34,21 +35,23 @@
     "priority": 0.45,
     "age": 41,
     "sex": "F",
+    "SI": 0.88,
     "vitals": {
         "NEWS2": 3,
-        "SI": 0.88,
-        "heart_rate": 98,
-        "bp_systolic": 118,
-        "bp_diastolic": 76,
+        "respiratory_rate": 18,
         "spo2": 97,
+        "o2_device": "Air",
+        "bp_systolic": 118,
+        "pulse_rate": 98,
+        "consciousness": "Alert",
         "temperature": 36.8
     },
     "resource_score": 1.5,
     "max_wait_time": 60,
     "current_wait_time": 15,
-    "treatment_time": 20,
     "total_time_in_system": 35,
     "escalation": false,
+    "treatment_time": 20,
     "status": "Admitted"
 }
 ```
@@ -62,21 +65,23 @@
     "priority": 0.92,
     "age": 54,
     "sex": "M",
+    "SI": 1.10,
     "vitals": {
         "NEWS2": 8,
-        "SI": 1.10,
-        "heart_rate": 120,
-        "bp_systolic": 105,
-        "bp_diastolic": 65,
+        "respiratory_rate": 24,
         "spo2": 93,
+        "o2_device": "O2",
+        "bp_systolic": 105,
+        "pulse_rate": 120,
+        "consciousness": "Voice",
         "temperature": 38.2
     },
     "resource_score": 3.2,
     "max_wait_time": 10,
     "current_wait_time": 8,
-    "treatment_time": 25,
     "total_time_in_system": 33,
     "escalation": false,
+    "treatment_time": 25,
     "status": "Discharged"
 }
 ```
@@ -90,21 +95,23 @@
     "priority": 0.25,
     "age": 29,
     "sex": "M",
+    "SI": 0.75,
     "vitals": {
         "NEWS2": 1,
-        "SI": 0.75,
-        "heart_rate": 85,
-        "bp_systolic": 120,
-        "bp_diastolic": 80,
+        "respiratory_rate": 16,
         "spo2": 99,
+        "o2_device": "Air",
+        "bp_systolic": 120,
+        "pulse_rate": 85,
+        "consciousness": "Alert",
         "temperature": 36.5
     },
     "resource_score": 0.8,
     "max_wait_time": 120,
     "current_wait_time": 30,
-    "treatment_time": null,
     "total_time_in_system": 30,
     "escalation": false,
+    "treatment_time": null,
     "status": "Waiting"
 }
 ```
@@ -120,42 +127,25 @@
 | priority             | FLOAT               |
 | age                  | INTEGER             |
 | sex                  | VARCHAR             |
-| NEWS2                | INTEGER             |
 | SI                   | FLOAT               |
-| heart_rate           | INTEGER             |
-| bp_systolic          | INTEGER             |
-| bp_diastolic         | INTEGER             |
+| NEWS2                | INTEGER             |
+| respiratory_rate     | INTEGER             |
 | spo2                 | INTEGER             |
+| o2_device            | VARCHAR             |
+| bp_systolic          | INTEGER             |
+| pulse_rate           | INTEGER             |
+| consciousness        | VARCHAR             |
 | temperature          | FLOAT               |
 | resource_score       | FLOAT               |
 | max_wait_time        | INTEGER             |
 | current_wait_time    | INTEGER             |
-| treatment_time       | INTEGER (nullable)  |
 | total_time_in_system | INTEGER             |
 | escalation           | BOOLEAN             |
+| treatment_time       | INTEGER (nullable)  |
 | status               | VARCHAR             |
 
 ### C. When to Log
 - On every priority recalculation (e.g., every 2 minutes)
 - On patient arrival
-- On escalation (max_wait_time exceeded)
-- On treatment/discharge
-
-
-## 2. Data Required by the ML / ETL Pipeline
-
-| Field                   | Type      | Use                         |
-|-------------------------|-----------|-----------------------------|
-| timestamp               | TIMESTAMP | Age & label horizon         |
-| zone                    | VARCHAR   | Stratify models             |
-| disease_code            | VARCHAR   | Look-up max_wait_time       |
-| max_wait_time           | INTEGER   | Breach threshold            |
-| current_wait_time       | INTEGER   | Feature + label             |
-| escalation              | BOOLEAN   | Ground-truth breach         |
-| NEWS2                   | INTEGER   | Model feature               |
-| SI                      | FLOAT     | Model feature               |
-| resource_score          | FLOAT     | Model feature               |
-| age                     | INTEGER   | Derive ageFactor            |
-| sex                     | VARCHAR   | Optional for fairness audit |
-| vitals.heart_rate, etc. | INTEGER   | Engineer trends if needed   |
+- On treatment(when inserted in treatment queue/discharge(removed from treatment queue))
 
