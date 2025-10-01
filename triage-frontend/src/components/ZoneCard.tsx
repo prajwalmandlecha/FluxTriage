@@ -140,15 +140,65 @@ const PatientCard: React.FC<{
         </div>
       </div>
 
+      {/* Emergency notification for exceeded wait */}
+      {type === "waiting" && patientCase.exceeded_wait && (
+        <div className="mb-3 p-3 rounded-lg border-2 border-red-300 bg-red-50 text-red-800 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5" />
+            <span className="font-semibold">EMERGENCY: Exceeded Max Wait</span>
+          </div>
+          <div className="text-sm font-medium text-right">
+            <div>Overdue by {patientCase.overdue_by_minutes} min</div>
+            {typeof patientCase.max_wait_time_resolved === "number" && (
+              <div>Max: {patientCase.max_wait_time_resolved} min</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {type === "waiting" &&
+        !patientCase.exceeded_wait &&
+        typeof patientCase.max_wait_time_resolved === "number" && (
+          <div className="mb-3 p-3 rounded-lg border border-yellow-200 bg-yellow-50 text-yellow-800 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-5 h-5" />
+              <span className="font-semibold">
+                Max Wait: {patientCase.max_wait_time_resolved} min
+              </span>
+            </div>
+            <div className="text-sm font-medium">
+              Remaining:{" "}
+              {Math.max(
+                0,
+                (patientCase.max_wait_time_resolved || 0) -
+                  (patientCase.minutes_waited || 0)
+              )}{" "}
+              min
+            </div>
+          </div>
+        )}
+
       <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
         <div className="flex items-center space-x-1">
           <Calendar className="w-4 h-4" />
           <span>Arrived: {formatTimeAgo(patientCase.arrival_time)}</span>
         </div>
-        {type === "treatment" && patientCase.treatment_duration && (
-          <div className="flex items-center space-x-1">
-            <Activity className="w-4 h-4" />
-            <span>Treatment: {patientCase.treatment_duration}min</span>
+        {type === "treatment" && (
+          <div className="flex items-center space-x-4">
+            {patientCase.treatment_duration && (
+              <div className="flex items-center space-x-1">
+                <Activity className="w-4 h-4" />
+                <span>Treatment: {patientCase.treatment_duration}min</span>
+              </div>
+            )}
+            {typeof patientCase.remaining_treatment_minutes === "number" && (
+              <div className="flex items-center space-x-1">
+                <Clock className="w-4 h-4" />
+                <span>
+                  Remaining: {patientCase.remaining_treatment_minutes}min
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -242,7 +292,14 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
           </div>
         ) : (
           <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-            {data.cases.map((patientCase) => (
+            {(type === "treatment"
+              ? [...data.cases].sort(
+                  (a, b) =>
+                    (a.remaining_treatment_minutes ?? 0) -
+                    (b.remaining_treatment_minutes ?? 0)
+                )
+              : data.cases
+            ).map((patientCase) => (
               <PatientCard
                 key={patientCase.id}
                 patientCase={patientCase}

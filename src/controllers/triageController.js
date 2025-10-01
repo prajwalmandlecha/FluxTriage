@@ -142,6 +142,8 @@ export const createCase = async (req, res) => {
     });
 
     await recalculateAllPriorities();
+    // Attempt to fill treatment slots immediately if capacity is available
+    await fillTreatmentSlots();
 
     return res.json({ message: "Case created successfully", data: newCase });
   } catch (error) {
@@ -156,10 +158,31 @@ export const getWaitingQueues = async (req, res) => {
     const queues = {};
 
     for (const zone of zones) {
-      const cases = await prisma.patientCase.findMany({
+      const rawCases = await prisma.patientCase.findMany({
         where: { zone, status: "WAITING" },
         orderBy: { priority: "desc" },
-        include: { patient: true },
+        include: { patient: true, disease: true },
+      });
+
+      const now = new Date();
+      const cases = rawCases.map((c) => {
+        const minutesWaited = Math.floor(
+          (now.getTime() - new Date(c.arrival_time).getTime()) / 60000
+        );
+        const maxWait = c.disease?.max_wait_time ?? null;
+        const exceeded = maxWait != null ? minutesWaited > maxWait : false;
+        const overdueBy =
+          exceeded && maxWait != null ? minutesWaited - maxWait : 0;
+
+        // Strip relation object to avoid changing response shape too much
+        const { disease, ...rest } = c;
+        return {
+          ...rest,
+          minutes_waited: minutesWaited,
+          exceeded_wait: exceeded,
+          overdue_by_minutes: overdueBy,
+          max_wait_time_resolved: maxWait,
+        };
       });
 
       queues[zone] = {
@@ -184,11 +207,31 @@ export const getTreatmentQueues = async (req, res) => {
     const treatmentQueues = {};
 
     for (const zone of zones) {
-      const cases = await prisma.patientCase.findMany({
+      const rawCases = await prisma.patientCase.findMany({
         where: { zone, status: "IN_TREATMENT" },
-        orderBy: { priority: "desc" },
         include: { patient: true },
       });
+
+      const now = new Date();
+      const cases = rawCases
+        .map((c) => {
+          const startedAt = new Date(c.last_eval_time);
+          const elapsedMinutes = Math.max(
+            0,
+            Math.floor((now.getTime() - startedAt.getTime()) / 60000)
+          );
+          const totalDuration = c.treatment_duration || 0;
+          const remaining = Math.max(0, totalDuration - elapsedMinutes);
+          return {
+            ...c,
+            remaining_treatment_minutes: remaining,
+          };
+        })
+        .sort(
+          (a, b) =>
+            (a.remaining_treatment_minutes || 0) -
+            (b.remaining_treatment_minutes || 0)
+        );
 
       treatmentQueues[zone] = {
         cases,
@@ -332,6 +375,36 @@ export const dischargePatient = async (req, res) => {
       totalTimeInMinutes: totalMinutes,
     });
 
+    // Append final DISCHARGED update with total time in system
+    const caseLog = await ensureCaseLogForCase({
+      caseId: updatedCase.id,
+      patientId: updatedCase.patient_id,
+      zone: updatedCase.zone,
+      age: updatedCase.age,
+      ageFactor: updatedCase.age >= 65 || updatedCase.age <= 15 ? 1 : 0,
+      arrivalTime: updatedCase.arrival_time,
+      diseaseCode: updatedCase.disease_code,
+    });
+    const waitingMinutes = Math.max(
+      0,
+      Math.floor(
+        ((updatedCase.time_served || updatedCase.last_eval_time).getTime() -
+          updatedCase.arrival_time.getTime()) /
+          60000
+      )
+    );
+    await appendCaseUpdate({
+      caseLogId: caseLog.id,
+      vitals: updatedCase.vitals || {},
+      news2: updatedCase.news2,
+      si: updatedCase.si,
+      resourceScore: updatedCase.resource_score,
+      priority: updatedCase.priority,
+      waitingMinutes,
+      rankInQueue: null,
+      status: "DISCHARGED",
+    });
+
     await fillTreatmentSlots();
 
     return res.status(200).json({
@@ -365,7 +438,7 @@ export const fillTreatmentSlots = async () => {
 
       console.log(`Filling ${availableSlots} available slots in ${zone} zone`);
 
-      // Get top waiting cases for this zone
+      // Get top waiting cases for this zone, include disease to avoid N+1
       const topCases = await prisma.patientCase.findMany({
         where: {
           zone: zone,
@@ -373,20 +446,17 @@ export const fillTreatmentSlots = async () => {
         },
         orderBy: { priority: "desc" },
         take: availableSlots,
+        include: { disease: true },
       });
 
       // Process each case
       for (const patientCase of topCases) {
-        const disease = await prisma.disease.findUnique({
-          where: { code: patientCase.disease_code || "" },
-        });
-
         let treatmentDuration = 30;
-        if (disease && disease.treatment_time) {
-          treatmentDuration = disease.treatment_time;
+        if (patientCase.disease && patientCase.disease.treatment_time) {
+          treatmentDuration = patientCase.disease.treatment_time;
         }
 
-        await prisma.patientCase.update({
+        const updatedCase = await prisma.patientCase.update({
           where: { id: patientCase.id },
           data: {
             status: "IN_TREATMENT",
@@ -396,6 +466,37 @@ export const fillTreatmentSlots = async () => {
         });
 
         console.log(`Case ${patientCase.id} sent to treatment in ${zone} zone`);
+
+        // Logging: ensure log and mark treatment start + append update
+        const caseLog = await ensureCaseLogForCase({
+          caseId: updatedCase.id,
+          patientId: updatedCase.patient_id,
+          zone: updatedCase.zone,
+          age: updatedCase.age,
+          ageFactor: updatedCase.age >= 65 || updatedCase.age <= 15 ? 1 : 0,
+          arrivalTime: updatedCase.arrival_time,
+          diseaseCode: updatedCase.disease_code,
+        });
+        await markTreatmentTimes({
+          caseId: updatedCase.id,
+          startTime: updatedCase.last_eval_time,
+        });
+        const waitingMinutes = Math.floor(
+          (updatedCase.last_eval_time.getTime() -
+            updatedCase.arrival_time.getTime()) /
+            60000
+        );
+        await appendCaseUpdate({
+          caseLogId: caseLog.id,
+          vitals: updatedCase.vitals || {},
+          news2: updatedCase.news2,
+          si: updatedCase.si,
+          resourceScore: updatedCase.resource_score,
+          priority: updatedCase.priority,
+          waitingMinutes,
+          rankInQueue: null,
+          status: "IN_TREATMENT",
+        });
       }
     }
 

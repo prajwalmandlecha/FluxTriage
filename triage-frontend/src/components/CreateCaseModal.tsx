@@ -162,6 +162,8 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
     setFormData({
       ...formData,
       disease_code: disease.code,
+      si: disease.severity,
+      resourceScore: disease.resource_score,
     });
     setDiseaseSearch(disease.name);
     setShowDiseaseDropdown(false);
@@ -537,13 +539,13 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
                           <div className="ml-3 flex flex-col items-end text-xs">
                             <span
                               className={`px-2 py-1 rounded ${
-                                disease.severity === 1
+                                disease.severity === 4
                                   ? "bg-red-100 text-red-700"
-                                  : disease.severity === 2
-                                  ? "bg-orange-100 text-orange-700"
                                   : disease.severity === 3
+                                  ? "bg-orange-100 text-orange-700"
+                                  : disease.severity === 2
                                   ? "bg-yellow-100 text-yellow-700"
-                                  : disease.severity === 4
+                                  : disease.severity === 1
                                   ? "bg-green-100 text-green-700"
                                   : "bg-blue-100 text-blue-700"
                               }`}
@@ -592,18 +594,22 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
                         </span>
                         <span
                           className={`px-2 py-1 rounded text-xs ${
-                            selectedDisease.severity === 1
+                            selectedDisease.severity === 4
                               ? "bg-red-100 text-red-700"
-                              : selectedDisease.severity === 2
-                              ? "bg-orange-100 text-orange-700"
                               : selectedDisease.severity === 3
+                              ? "bg-orange-100 text-orange-700"
+                              : selectedDisease.severity === 2
                               ? "bg-yellow-100 text-yellow-700"
-                              : selectedDisease.severity === 4
+                              : selectedDisease.severity === 1
                               ? "bg-green-100 text-green-700"
                               : "bg-blue-100 text-blue-700"
                           }`}
                         >
                           Severity Level {selectedDisease.severity}
+                        </span>
+                        <span className="text-blue-700">
+                          <strong>Resource Score:</strong>{" "}
+                          {selectedDisease.resource_score}
                         </span>
                       </div>
                     </div>

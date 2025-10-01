@@ -69,7 +69,8 @@ model Disease {
   description    String?
   treatment_time Int    // in minutes
   max_wait_time  Int    // max acceptable wait (minutes)
-  severity       Int    // 1–4 or 1–5 scale
+  severity       Int    // Severity Index 1–4 (1 = least severe, 4 = most severe)
+  resource_score Float  @default(1.0) // Resource Score (disease-level default)
   patientCases   PatientCase[] 
 }
 

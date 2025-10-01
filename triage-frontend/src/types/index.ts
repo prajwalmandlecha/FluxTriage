@@ -37,6 +37,13 @@ export interface PatientCase {
   disease_code?: string;
   patient_id: string;
   patient: Patient;
+  // Computed fields from backend for waiting queue
+  minutes_waited?: number;
+  exceeded_wait?: boolean;
+  overdue_by_minutes?: number;
+  max_wait_time_resolved?: number | null;
+  // Computed fields from backend for treatment queue
+  remaining_treatment_minutes?: number;
 }
 
 export interface QueueData {
@@ -90,4 +97,5 @@ export interface Disease {
   treatment_time: number;
   max_wait_time: number;
   severity: number;
+  resource_score: number;
 }
