@@ -105,8 +105,8 @@ export function calculatePriorityScore(
  * NEWS2 (National Early Warning Score 2) assesses vital signs:
  * - 0-1: Low risk (GREEN)
  * - 2-4: Medium risk (YELLOW)
- * - 5-8: High risk (ORANGE)
- * - 9+: Critical risk (RED)
+ * - 5-6: High risk (ORANGE)
+ * - 7+: Critical risk (RED) - NHS threshold for urgent medical review
  *
  * @param {number} news2Score - Calculated NEWS2 score (0-20)
  * @returns {string} Zone assignment (RED/ORANGE/YELLOW/GREEN)
