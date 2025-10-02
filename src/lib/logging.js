@@ -1,206 +1,143 @@
 import prisma from "./prisma.js";
 
-//create basic patient logs
+/**
+ * Create a new CaseLog entry (time-series snapshot)
+ * 
+ * Creates a complete snapshot of the patient's state at a specific moment in time.
+ * This function is called at key events:
+ * - Patient arrival (initial triage)
+ * - Every 2 minutes during priority recalculation
+ * - When patient is sent to treatment queue
+ * - When patient is discharged
+ * 
+ * Each call creates a NEW CaseLog record. Multiple logs can exist for the same case_id,
+ * forming a time-series dataset for ML analysis of patient flow, priority evolution,
+ * and wait time patterns.
+ * 
+ * @param {Object} params - Complete case log parameters
+ * @param {string} params.patientId - Patient ID
+ * @param {string} params.caseId - PatientCase ID
+ * @param {string} params.zone - Current triage zone (RED/ORANGE/YELLOW/GREEN)
+ * @param {string} [params.diseaseCode] - ICD-10 or other disease code (optional)
+ * @param {number} params.priority - Calculated priority score
+ * @param {number} params.age - Patient age in years
+ * @param {string} params.sex - Patient sex (MALE/FEMALE/OTHER)
+ * @param {number} params.SI - Severity Index (1-4)
+ * @param {number} params.NEWS2 - NEWS2 score (0-20)
+ * @param {number} params.respiratory_rate - Breaths per minute
+ * @param {number} params.spo2 - Oxygen saturation percentage (0-100)
+ * @param {string} params.o2_device - "Air" or "O2" (oxygen device)
+ * @param {number} params.bp_systolic - Systolic blood pressure (mmHg)
+ * @param {number} params.pulse_rate - Heart rate (bpm)
+ * @param {string} params.consciousness - AVPU consciousness level (Alert/Voice/Pain/Unresponsive)
+ * @param {number} params.temperature - Body temperature (°C)
+ * @param {number} params.resource_score - Resource consumption estimate (1.0-5.0)
+ * @param {number} [params.max_wait_time] - Maximum acceptable wait time (minutes)
+ * @param {number} params.current_wait_time - Time waited so far (minutes)
+ * @param {number} params.total_time_in_system - Total time from arrival to now (minutes)
+ * @param {boolean} [params.escalation] - True if wait time exceeded max_wait_time
+ * @param {number} [params.treatment_time] - Time from arrival to treatment start (minutes)
+ * @param {string} params.status - Current status (Waiting/IN_TREATMENT/DISCHARGED)
+ * @returns {Promise<Object>} Created CaseLog record
+ */
 export async function createCaseLog({
-  caseId,
   patientId,
+  caseId,
   zone,
-  age,
-  ageFactor,
-  arrivalTime,
   diseaseCode,
+  priority,
+  age,
+  sex,
+  SI,
+  NEWS2,
+  respiratory_rate,
+  spo2,
+  o2_device,
+  bp_systolic,
+  pulse_rate,
+  consciousness,
+  temperature,
+  resource_score,
+  max_wait_time,
+  current_wait_time,
+  total_time_in_system,
+  escalation,
+  treatment_time,
+  status,
 }) {
   return prisma.caseLog.create({
     data: {
-      case_id: caseId,
       patient_id: patientId,
+      case_id: caseId,
       zone,
-      age,
-      age_factor: ageFactor,
-      arrival_time: arrivalTime,
-      disease_code: diseaseCode || null,
-    },
-  });
-}
-
-//detailed logs of vitals,news2 score etc.
-export async function appendCaseUpdate({
-  caseLogId,
-  vitals,
-  news2,
-  si,
-  resourceScore,
-  priority,
-  waitingMinutes,
-  rankInQueue,
-  status,
-}) {
-  const caseLog = await prisma.caseLog.findUnique({ where: { id: caseLogId } });
-
-  let maxWaitTime = null;
-  let diseaseCode = caseLog?.disease_code ?? null;
-  //get max wait time from disease if available
-  if (diseaseCode) {
-    try {
-      const disease = await prisma.disease.findUnique({
-        where: { code: diseaseCode },
-      });
-      if (disease) maxWaitTime = disease.max_wait_time;
-    } catch (_) {
-      // console.error("Error fetching disease in appendCaseUpdate:", error);
-    }
-  }
-
-  
-  const now = new Date();
-  const arrivalTime = caseLog?.arrival_time
-    ? new Date(caseLog.arrival_time)
-    : null;
-
-
-  //total time in system
-  let totalTimeInSystem = null;
-  if (typeof caseLog?.total_time_in_ed === "number") {
-    totalTimeInSystem = caseLog.total_time_in_ed;
-  } else if (arrivalTime) {
-    totalTimeInSystem = Math.floor(
-      (now.getTime() - arrivalTime.getTime()) / 60000
-    );
-  }
-
-  //treatment time (from arrival to treatment start)
-  let treatmentTime = null;
-  if (caseLog?.treatment_start_time && arrivalTime) {
-    const start = new Date(caseLog.treatment_start_time);
-    treatmentTime = Math.max(
-      0,
-      Math.floor((start.getTime() - arrivalTime.getTime()) / 60000)
-    );
-  }
-
-  // escalation when current wait exceeds max wait
-  let escalation = false;
-  if (maxWaitTime != null && typeof waitingMinutes === "number") {
-    escalation = waitingMinutes > maxWaitTime;
-  }
-
-  // Persist escalation flag at the case level when first detected
-  if (escalation && caseLog && !caseLog.escalation) {
-    try {
-      await prisma.caseLog.update({
-        where: { id: caseLog.id },
-        data: { escalation: true },
-      });
-    } catch (_) {}
-  }
-
-  // Map gender to sex for logging (M/F/O)
-  let sex = null;
-  if (caseLog?.patient_id) {
-    try {
-      const patient = await prisma.patient.findUnique({
-        where: { id: caseLog.patient_id },
-      });
-      if (patient?.gender === "MALE") sex = "M";
-      else if (patient?.gender === "FEMALE") sex = "F";
-      else if (patient?.gender) sex = "O";
-    } catch (_) {}
-  }
-
-  // vital strucuture for ml part
-  const normalizedVitals = vitals && typeof vitals === "object" ? vitals : {};
-  const specVitals = {
-    NEWS2: news2,
-    SI: si,
-    heart_rate: normalizedVitals.heart_rate ?? null,
-    bp_systolic: normalizedVitals.systolic_bp ?? null,
-    bp_diastolic: normalizedVitals.diastolic_bp ?? null,
-    spo2: normalizedVitals.oxygen_saturation ?? null,
-    temperature: normalizedVitals.temperature ?? null,
-  };
-
-  const vitalsJson = {
-    ...specVitals,
-    raw: normalizedVitals,
-    resource_score: resourceScore,
-    max_wait_time: maxWaitTime ?? null,
-    current_wait_time: waitingMinutes,
-    total_time_in_system: totalTimeInSystem,
-    escalation,
-    treatment_time: treatmentTime,
-    zone: caseLog?.zone ?? null,
-    disease_code: diseaseCode,
-    age: caseLog?.age ?? null,
-    sex,
-  };
-
-  return prisma.caseUpdate.create({
-    data: {
-      case_log_id: caseLogId,
-      vitals_json: vitalsJson,
-      news2,
-      si,
-      resourceScore,
+      disease_code: diseaseCode ?? null,
       priority,
-      waiting_time: waitingMinutes,
-      rank_in_queue: rankInQueue ?? null,
+      age,
+      sex,
+      SI,
+      NEWS2,
+      respiratory_rate,
+      spo2,
+      o2_device,
+      bp_systolic,
+      pulse_rate,
+      consciousness,
+      temperature,
+      resource_score,
+      max_wait_time: max_wait_time ?? null,
+      current_wait_time,
+      total_time_in_system,
+      escalation: escalation ?? false,
+      treatment_time: treatment_time ?? null,
       status,
     },
   });
 }
 
-export async function markTreatmentTimes({ caseId, startTime, endTime }) {
-  return prisma.caseLog.updateMany({
-    where: { case_id: caseId },
-    data: {
-      treatment_start_time: startTime ?? undefined,
-      treatment_end_time: endTime ?? undefined,
-    },
-  });
-}
-
-export async function setOutcomeAndTotals({
-  caseId,
-  outcome,
-  totalTimeInMinutes,
-}) {
-  return prisma.caseLog.updateMany({
-    where: { case_id: caseId },
-    data: {
-      outcome: outcome ?? undefined,
-      total_time_in_ed: totalTimeInMinutes ?? undefined,
-    },
-  });
-}
-
-
+/**
+ * Retrieve all logs for a specific case (time-series)
+ * 
+ * Returns all CaseLog records for a case ordered chronologically.
+ * Useful for viewing complete patient journey and exporting data for ML analysis.
+ * 
+ * @param {string} caseId - PatientCase ID
+ * @returns {Promise<Array>} Array of CaseLog records ordered by timestamp
+ */
 export async function getCaseLogs(caseId) {
-  return prisma.caseLog.findFirst({
+  return prisma.caseLog.findMany({
     where: { case_id: caseId },
-    include: { updates: { orderBy: { timestamp: "asc" } } },
+    orderBy: { timestamp: "asc" },
   });
 }
 
-export async function ensureCaseLogForCase({
-  caseId,
-  patientId,
-  zone,
-  age,
-  ageFactor,
-  arrivalTime,
-  diseaseCode,
-}) {
-  const existing = await prisma.caseLog.findFirst({
-    where: { case_id: caseId },
+/**
+ * Get all logs within a time range (for batch ML export)
+ * 
+ * @param {Date} startDate - Start of time range
+ * @param {Date} endDate - End of time range
+ * @returns {Promise<Array>} Array of CaseLog records
+ */
+export async function getCaseLogsInRange(startDate, endDate) {
+  return prisma.caseLog.findMany({
+    where: {
+      timestamp: {
+        gte: startDate,
+        lte: endDate,
+      },
+    },
+    orderBy: { timestamp: "asc" },
   });
-  if (existing) return existing;
-  return createCaseLog({
-    caseId,
-    patientId,
-    zone,
-    age,
-    ageFactor,
-    arrivalTime,
-    diseaseCode,
+}
+
+/**
+ * Get all logs for a specific patient (across all cases)
+ * 
+ * @param {string} patientId - Patient ID
+ * @returns {Promise<Array>} Array of CaseLog records
+ */
+export async function getPatientLogs(patientId) {
+  return prisma.caseLog.findMany({
+    where: { patient_id: patientId },
+    orderBy: { timestamp: "asc" },
   });
 }

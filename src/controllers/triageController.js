@@ -1,29 +1,27 @@
 import prisma from "../lib/prisma.js";
 import cron from "node-cron";
 import { calculateNEWS2, validateVitals } from "../lib/news2.js";
-import {
-  createCaseLog,
-  appendCaseUpdate,
-  ensureCaseLogForCase,
-  markTreatmentTimes,
-  setOutcomeAndTotals,
-} from "../lib/logging.js";
+import { assignZone, calculatePriorityScore, calculateAgeFactor } from "../lib/priority.js";
+import { createCaseLog } from "../lib/logging.js";
 
-//assign zone based on NEWS2 and SI
-const assignZone = (news2, si) => {
-  if (news2 >= 7 || si === 4) return "RED";
-  if (news2 >= 5 || si === 3) return "ORANGE";
-  if (news2 >= 3 || si === 2) return "YELLOW";
-  return "GREEN";
-};
-
-//zone weights
-const Zones = {
-  RED: { wNEWS2: 0.4, wSI: 0.3, wT: 0.0, wR: 0.2, wA: 0.1 },
-  ORANGE: { wNEWS2: 0.35, wSI: 0.25, wT: 0.05, wR: 0.25, wA: 0.1 },
-  YELLOW: { wNEWS2: 0.25, wSI: 0.2, wT: 0.15, wR: 0.3, wA: 0.1 },
-  GREEN: { wNEWS2: 0.1, wSI: 0.1, wT: 0.3, wR: 0.2, wA: 0.3 },
-};
+/**
+ * Helper function to extract individual vitals from backend vitals object
+ * Maps backend field names to snake_case schema field names
+ * 
+ * @param {Object} vitals - Backend vitals object
+ * @returns {Object} Individual vitals fields for logging
+ */
+function extractVitalsForLogging(vitals) {
+  return {
+    respiratory_rate: vitals.respiratory_rate || 0,
+    spo2: vitals.oxygen_saturation || 0,
+    o2_device: vitals.supplemental_oxygen ? "O2" : "Air",
+    bp_systolic: vitals.systolic_bp || 0,
+    pulse_rate: vitals.heart_rate || 0,
+    consciousness: vitals.consciousness_level || "Alert",
+    temperature: vitals.temperature || 36.5,
+  };
+}
 
 //treatment capacities
 const TreatmentCapacity = {
@@ -43,29 +41,6 @@ const checkZoneCapacity = async (zone) => {
   });
 
   return currentInTreatment < TreatmentCapacity[zone];
-};
-
-const calculatePriority = (
-  zone,
-  news2,
-  si,
-  resourceScore,
-  ageFactor,
-  arrivalTime
-) => {
-  const currentTime = new Date();
-  const minutesWaited = Math.floor(
-    (currentTime.getTime() - arrivalTime.getTime()) / 60000
-  );
-  const timeFactor = Math.min(4, Math.floor(minutesWaited));
-  const { wNEWS2, wSI, wT, wR, wA } = Zones[zone];
-  return (
-    wNEWS2 * news2 +
-    wSI * si +
-    wT * timeFactor +
-    wR * resourceScore +
-    wA * ageFactor
-  );
 };
 
 export const createCase = async (req, res) => {
@@ -88,15 +63,15 @@ export const createCase = async (req, res) => {
     const computedNews2 = calculateNEWS2(vitals);
     const zone = assignZone(computedNews2, si);
     const arrival = new Date();
-    const ageFactor = ageInt >= 65 || ageInt <= 15 ? 1 : 0;
+    const ageFactor = calculateAgeFactor(ageInt);
 
-    const priority = calculatePriority(
+    const priority = calculatePriorityScore(
       zone,
       computedNews2,
       si,
+      0, // Initial waiting time is 0
       resourceScore,
-      ageFactor,
-      arrival
+      ageInt
     );
 
     const patient = await prisma.patient.findUnique({
@@ -123,26 +98,29 @@ export const createCase = async (req, res) => {
       },
     });
 
-    // Create initial log + update
-    const caseLog = await createCaseLog({
-      caseId: newCase.id,
+    // Create initial log entry for patient arrival
+    const diseaseData = disease_code ? await prisma.disease.findUnique({ where: { code: disease_code } }) : null;
+    const maxWaitTime = diseaseData?.max_wait_time ?? null;
+    const vitalFields = extractVitalsForLogging(vitals);
+    
+    await createCaseLog({
       patientId: id,
+      caseId: newCase.id,
       zone,
-      age: ageInt,
-      ageFactor,
-      arrivalTime: arrival,
       diseaseCode: disease_code,
-    });
-    await appendCaseUpdate({
-      caseLogId: caseLog.id,
-      vitals,
-      news2: computedNews2,
-      si,
-      resourceScore,
       priority,
-      waitingMinutes: 0,
-      rankInQueue: null,
-      status: "WAITING",
+      age: ageInt,
+      sex: patient.gender,
+      SI: si,
+      NEWS2: computedNews2,
+      ...vitalFields,
+      resource_score: resourceScore,
+      max_wait_time: maxWaitTime,
+      current_wait_time: 0,
+      total_time_in_system: 0,
+      escalation: false,
+      treatment_time: null,
+      status: "Waiting",
     });
 
     //temporary disable
@@ -167,28 +145,10 @@ export const getWaitingQueues = async (req, res) => {
       const rawCases = await prisma.patientCase.findMany({
         where: { zone, status: "WAITING" },
         orderBy: { priority: "desc" },
-        include: { patient: true, disease: true },
-      });
-
-      const now = new Date();
-      //calculate times
-      const cases = rawCases.map((c) => {
-        const minutesWaited = Math.floor(
-          (now.getTime() - new Date(c.arrival_time).getTime()) / 60000
-        );
-        const maxWait = c.disease?.max_wait_time ?? null;
-        const exceeded = maxWait != null ? minutesWaited > maxWait : false;
-        const overdueBy =
-          exceeded && maxWait != null ? minutesWaited - maxWait : 0;
-
-        const { disease, ...rest } = c;
-        return {
-          ...rest,
-          minutes_waited: minutesWaited,
-          exceeded_wait: exceeded,
-          overdue_by_minutes: overdueBy,
-          max_wait_time_resolved: maxWait,
-        };
+        include: { 
+          patient: true,
+          disease: true  // Include disease data for max_wait_time
+        },
       });
 
       queues[zone] = {
@@ -215,8 +175,31 @@ export const getTreatmentQueues = async (req, res) => {
     for (const zone of zones) {
       const rawCases = await prisma.patientCase.findMany({
         where: { zone, status: "IN_TREATMENT" },
-        include: { patient: true },
+        include: { 
+          patient: true,
+          disease: true  // Include disease data for max_wait_time and treatment_time
+        },
       });
+
+      const currentTime = new Date();
+      
+      // Calculate remaining treatment time for each case and add it to the case object
+      const casesWithRemainingTime = cases.map(patientCase => {
+        const treatmentStartTime = patientCase.last_eval_time;
+        const treatmentDuration = patientCase.treatment_duration ?? 0;
+        const elapsedTime = Math.floor(
+          (currentTime.getTime() - treatmentStartTime.getTime()) / 60000
+        );
+        const remainingTime = Math.max(0, treatmentDuration - elapsedTime);
+        
+        return {
+          ...patientCase,
+          remainingTreatmentTime: remainingTime
+        };
+      });
+      
+      // Sort by remaining treatment time (ascending - least time remaining first)
+      casesWithRemainingTime.sort((a, b) => a.remainingTreatmentTime - b.remainingTreatmentTime);
 
       //minutes remaining
       const now = new Date();
@@ -241,10 +224,10 @@ export const getTreatmentQueues = async (req, res) => {
         );
 
       treatmentQueues[zone] = {
-        cases,
-        count: cases.length,
+        cases: casesWithRemainingTime,
+        count: casesWithRemainingTime.length,
         capacity: TreatmentCapacity[zone],
-        available: TreatmentCapacity[zone] - cases.length,
+        available: TreatmentCapacity[zone] - casesWithRemainingTime.length,
       };
     }
 
@@ -300,34 +283,42 @@ export const sendToTreatment = async (req, res) => {
       },
     });
 
-    // Log treatment start
-    const caseLog = await ensureCaseLogForCase({
-      caseId: updatedCase.id,
-      patientId: updatedCase.patient_id,
-      zone: updatedCase.zone,
-      age: updatedCase.age,
-      ageFactor: updatedCase.age >= 65 || updatedCase.age <= 15 ? 1 : 0,
-      arrivalTime: updatedCase.arrival_time,
-      diseaseCode: updatedCase.disease_code,
+    // Create log entry for treatment start
+    const patientData = await prisma.patient.findUnique({
+      where: { id: updatedCase.patient_id }
     });
-    await markTreatmentTimes({
-      caseId: updatedCase.id,
-      startTime: updatedCase.last_eval_time,
-    });
-    const waitingMinutes = Math.floor(
-      (updatedCase.last_eval_time.getTime() -
-        updatedCase.arrival_time.getTime()) /
-        60000
+    
+    // Current wait time = time from arrival to now (this gets FROZEN when entering treatment)
+    const currentWaitTime = Math.floor(
+      (updatedCase.last_eval_time.getTime() - updatedCase.arrival_time.getTime()) / 60000
     );
-    await appendCaseUpdate({
-      caseLogId: caseLog.id,
-      vitals: updatedCase.vitals || {},
-      news2: updatedCase.news2,
-      si: updatedCase.si,
-      resourceScore: updatedCase.resource_score,
+    const totalTimeInSystem = currentWaitTime; // Same as wait time when entering treatment
+    
+    let maxWaitTime = disease?.max_wait_time ?? updatedCase.max_wait_time ?? null;
+    if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
+    if (isNaN(maxWaitTime)) maxWaitTime = null;
+    
+  const escalation = maxWaitTime !== null ? currentWaitTime > maxWaitTime : false;
+    
+    const vitalFields = extractVitalsForLogging(updatedCase.vitals || {});
+    
+    await createCaseLog({
+      patientId: updatedCase.patient_id,
+      caseId: updatedCase.id,
+      zone: updatedCase.zone,
+      diseaseCode: updatedCase.disease_code,
       priority: updatedCase.priority,
-      waitingMinutes,
-      rankInQueue: null,
+      age: updatedCase.age,
+      sex: patientData.gender,
+      SI: updatedCase.si,
+      NEWS2: updatedCase.news2,
+      ...vitalFields,
+      resource_score: updatedCase.resource_score,
+      max_wait_time: maxWaitTime,
+      current_wait_time: currentWaitTime, // Frozen wait time
+      total_time_in_system: totalTimeInSystem,
+      escalation,
+      treatment_time: 0, // Treatment just started, so treatment time is 0
       status: "IN_TREATMENT",
     });
 
@@ -367,49 +358,58 @@ export const dischargePatient = async (req, res) => {
       },
     });
 
-    // Log treatment end and outcome
-    await markTreatmentTimes({
-      caseId: updatedCase.id,
-      endTime: updatedCase.last_eval_time,
+    // Create log entry for patient discharge
+    const patientData = await prisma.patient.findUnique({
+      where: { id: updatedCase.patient_id }
     });
-    const totalMinutes = Math.floor(
-      (updatedCase.last_eval_time.getTime() -
-        updatedCase.arrival_time.getTime()) /
-        60000
+    
+    // Get the last IN_TREATMENT log to retrieve the frozen current_wait_time
+    const lastTreatmentLog = await prisma.caseLog.findFirst({
+      where: { 
+        case_id: updatedCase.id,
+        status: "IN_TREATMENT"
+      },
+      orderBy: { timestamp: "desc" }
+    });
+    
+    const totalTimeInSystem = Math.floor(
+      (updatedCase.last_eval_time.getTime() - updatedCase.arrival_time.getTime()) / 60000
     );
-    await setOutcomeAndTotals({
-      caseId: updatedCase.id,
-      outcome: "discharged",
-      totalTimeInMinutes: totalMinutes,
-    });
-
-    // Append final DISCHARGED update with total time in system
-    const caseLog = await ensureCaseLogForCase({
-      caseId: updatedCase.id,
+    
+    // Use frozen wait time from when patient entered treatment
+    const currentWaitTime = lastTreatmentLog?.current_wait_time ?? totalTimeInSystem;
+    
+    // Calculate treatment time: total time - wait time
+    const treatmentTime = totalTimeInSystem - currentWaitTime;
+    
+    const diseaseData = updatedCase.disease_code 
+      ? await prisma.disease.findUnique({ where: { code: updatedCase.disease_code } })
+      : null;
+    let maxWaitTime = diseaseData?.max_wait_time ?? updatedCase.max_wait_time ?? null;
+    if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
+    if (isNaN(maxWaitTime)) maxWaitTime = null;
+    
+  const escalation = maxWaitTime !== null ? currentWaitTime > maxWaitTime : false;
+    
+    const vitalFields = extractVitalsForLogging(updatedCase.vitals || {});
+    
+    await createCaseLog({
       patientId: updatedCase.patient_id,
+      caseId: updatedCase.id,
       zone: updatedCase.zone,
-      age: updatedCase.age,
-      ageFactor: updatedCase.age >= 65 || updatedCase.age <= 15 ? 1 : 0,
-      arrivalTime: updatedCase.arrival_time,
       diseaseCode: updatedCase.disease_code,
-    });
-    const waitingMinutes = Math.max(
-      0,
-      Math.floor(
-        ((updatedCase.time_served || updatedCase.last_eval_time).getTime() -
-          updatedCase.arrival_time.getTime()) /
-          60000
-      )
-    );
-    await appendCaseUpdate({
-      caseLogId: caseLog.id,
-      vitals: updatedCase.vitals || {},
-      news2: updatedCase.news2,
-      si: updatedCase.si,
-      resourceScore: updatedCase.resource_score,
       priority: updatedCase.priority,
-      waitingMinutes,
-      rankInQueue: null,
+      age: updatedCase.age,
+      sex: patientData.gender,
+      SI: updatedCase.si,
+      NEWS2: updatedCase.news2,
+      ...vitalFields,
+      resource_score: updatedCase.resource_score,
+      max_wait_time: maxWaitTime,
+      current_wait_time: currentWaitTime,
+      total_time_in_system: totalTimeInSystem,
+      escalation,
+      treatment_time: treatmentTime,
       status: "DISCHARGED",
     });
 
@@ -421,6 +421,59 @@ export const dischargePatient = async (req, res) => {
     });
   } catch (error) {
     console.error("Error discharging patient:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateTreatmentDuration = async (req, res) => {
+  try {
+    const { caseId, newDuration } = req.body;
+    
+    if (!caseId) {
+      return res.status(400).json({ message: "caseId is required" });
+    }
+    
+    if (newDuration == null || newDuration < 0) {
+      return res.status(400).json({ message: "Valid newDuration is required" });
+    }
+
+    const patientCase = await prisma.patientCase.findUnique({
+      where: { id: caseId },
+    });
+
+    if (!patientCase) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    if (patientCase.status !== "IN_TREATMENT") {
+      return res.status(400).json({ message: "Patient is not in treatment" });
+    }
+
+    // Calculate elapsed time since treatment started
+    const elapsedMinutes = Math.floor(
+      (Date.now() - new Date(patientCase.last_eval_time).getTime()) / 60000
+    );
+
+    // New total duration = remaining time + elapsed time
+    const newTotalDuration = newDuration + elapsedMinutes;
+
+    const updatedCase = await prisma.patientCase.update({
+      where: { id: caseId },
+      data: {
+        treatment_duration: newTotalDuration,
+      },
+    });
+
+    console.log(
+      `Updated treatment duration for case ${caseId}: ${patientCase.treatment_duration} -> ${newTotalDuration} minutes (remaining: ${newDuration}m, elapsed: ${elapsedMinutes}m)`
+    );
+
+    return res.status(200).json({
+      message: "Treatment duration updated successfully",
+      data: updatedCase,
+    });
+  } catch (error) {
+    console.error("Error updating treatment duration:", error);
     return res.status(500).json({ message: error.message });
   }
 };
@@ -464,47 +517,57 @@ export const fillTreatmentSlots = async () => {
           treatmentDuration = patientCase.disease.treatment_time;
         }
 
+        const treatmentStartTime = new Date();
+        
         const updatedCase = await prisma.patientCase.update({
           where: { id: patientCase.id },
           data: {
             status: "IN_TREATMENT",
             treatment_duration: treatmentDuration,
-            last_eval_time: new Date(),
+            last_eval_time: treatmentStartTime,
           },
         });
 
-        console.log(`Case ${patientCase.id} sent to treatment in ${zone} zone`);
-
-        // Logging: ensure log and mark treatment start + append update
-        const caseLog = await ensureCaseLogForCase({
-          caseId: updatedCase.id,
-          patientId: updatedCase.patient_id,
-          zone: updatedCase.zone,
-          age: updatedCase.age,
-          ageFactor: updatedCase.age >= 65 || updatedCase.age <= 15 ? 1 : 0,
-          arrivalTime: updatedCase.arrival_time,
-          diseaseCode: updatedCase.disease_code,
+        // Create log entry for automatic treatment start
+        const patientData = await prisma.patient.findUnique({
+          where: { id: updatedCase.patient_id }
         });
-        await markTreatmentTimes({
-          caseId: updatedCase.id,
-          startTime: updatedCase.last_eval_time,
-        });
-        const waitingMinutes = Math.floor(
-          (updatedCase.last_eval_time.getTime() -
-            updatedCase.arrival_time.getTime()) /
-            60000
+        
+        // Current wait time = time from arrival to now (this gets FROZEN when entering treatment)
+        const currentWaitTime = Math.floor(
+          (treatmentStartTime.getTime() - updatedCase.arrival_time.getTime()) / 60000
         );
-        await appendCaseUpdate({
-          caseLogId: caseLog.id,
-          vitals: updatedCase.vitals || {},
-          news2: updatedCase.news2,
-          si: updatedCase.si,
-          resourceScore: updatedCase.resource_score,
+        const totalTimeInSystem = currentWaitTime;
+        
+        let maxWaitTime = disease?.max_wait_time ?? updatedCase.max_wait_time ?? null;
+        if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
+        if (isNaN(maxWaitTime)) maxWaitTime = null;
+        
+  const escalation = maxWaitTime !== null ? currentWaitTime > maxWaitTime : false;
+        
+        const vitalFields = extractVitalsForLogging(updatedCase.vitals || {});
+        
+        await createCaseLog({
+          patientId: updatedCase.patient_id,
+          caseId: updatedCase.id,
+          zone: updatedCase.zone,
+          diseaseCode: updatedCase.disease_code,
           priority: updatedCase.priority,
-          waitingMinutes,
-          rankInQueue: null,
+          age: updatedCase.age,
+          sex: patientData.gender,
+          SI: updatedCase.si,
+          NEWS2: updatedCase.news2,
+          ...vitalFields,
+          resource_score: updatedCase.resource_score,
+          max_wait_time: maxWaitTime,
+          current_wait_time: currentWaitTime, // Frozen wait time
+          total_time_in_system: totalTimeInSystem,
+          escalation,
+          treatment_time: 0, // Treatment just started, so treatment time is 0
           status: "IN_TREATMENT",
         });
+
+        console.log(`Case ${patientCase.id} sent to treatment in ${zone} zone (logged)`);
       }
     }
 
@@ -584,15 +647,17 @@ export const recalculateAllPriorities = async () => {
     const currentTime = new Date();
 
     for (const patientCase of waitingCases) {
-      const ageFactor = patientCase.age >= 65 || patientCase.age <= 15 ? 1 : 0;
+      const waitingMinutes = Math.floor(
+        (currentTime.getTime() - patientCase.arrival_time.getTime()) / 60000
+      );
 
-      const newPriority = calculatePriority(
+      const newPriority = calculatePriorityScore(
         patientCase.zone,
         patientCase.news2,
         patientCase.si,
+        waitingMinutes,  // FIX: Added missing waitingMinutes parameter
         patientCase.resource_score,
-        ageFactor,
-        patientCase.arrival_time
+        patientCase.age
       );
 
       await prisma.patientCase.update({
@@ -603,30 +668,44 @@ export const recalculateAllPriorities = async () => {
         },
       });
 
-      // Append periodic update log
-      const caseLog = await ensureCaseLogForCase({
-        caseId: patientCase.id,
-        patientId: patientCase.patient_id,
-        zone: patientCase.zone,
-        age: patientCase.age,
-        ageFactor,
-        arrivalTime: patientCase.arrival_time,
-        diseaseCode: patientCase.disease_code,
+      // Create periodic recalculation log entry
+      const patientData = await prisma.patient.findUnique({
+        where: { id: patientCase.patient_id }
       });
-      const waitingMinutes = Math.floor(
+      
+      const totalTimeInSystem = Math.floor(
         (currentTime.getTime() - patientCase.arrival_time.getTime()) / 60000
       );
-      // Rank in queue is complex; optionally null for now
-      await appendCaseUpdate({
-        caseLogId: caseLog.id,
-        vitals: patientCase.vitals || {},
-        news2: patientCase.news2,
-        si: patientCase.si,
-        resourceScore: patientCase.resource_score,
+      
+      // Get max_wait_time from disease or case
+      const diseaseData = patientCase.disease_code 
+        ? await prisma.disease.findUnique({ where: { code: patientCase.disease_code } })
+        : null;
+  let maxWaitTime = diseaseData?.max_wait_time ?? patientCase.max_wait_time ?? null;
+  if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
+  if (isNaN(maxWaitTime)) maxWaitTime = null;
+  const escalation = maxWaitTime !== null ? waitingMinutes > maxWaitTime : false;
+      
+      const vitalFields = extractVitalsForLogging(patientCase.vitals || {});
+      
+      await createCaseLog({
+        patientId: patientCase.patient_id,
+        caseId: patientCase.id,
+        zone: patientCase.zone,
+        diseaseCode: patientCase.disease_code,
         priority: newPriority,
-        waitingMinutes,
-        rankInQueue: null,
-        status: patientCase.status,
+        age: patientCase.age,
+        sex: patientData.gender,
+        SI: patientCase.si,
+        NEWS2: patientCase.news2,
+        ...vitalFields,
+        resource_score: patientCase.resource_score,
+        max_wait_time: maxWaitTime,
+        current_wait_time: waitingMinutes,
+        total_time_in_system: totalTimeInSystem,
+        escalation,
+        treatment_time: null, // Still waiting
+        status: "Waiting",
       });
     }
 
@@ -649,7 +728,7 @@ export const startPriorityScheduler = () => {
     refreshData();
   });
 
-  console.log(`Priority scheduler started - will run every ${minutes} minutes`);
+  console.log(`Priority & auto-discharge scheduler started - will run every ${minutes} minutes`);
 };
 
 export const triggerFillTreatmentSlots = async (req, res) => {
@@ -681,14 +760,14 @@ export const autoDischargeCompletedTreatments = async () => {
 
     for (const patientCase of inTreatmentCases) {
       const treatmentStartTime = patientCase.last_eval_time;
-      // When treatment started
+      const treatmentDuration = patientCase.treatment_duration ?? 0;
       const treatmentEndTime = new Date(
-        treatmentStartTime.getTime() + patientCase.treatment_duration * 60000 // Convert minutes to milliseconds
+        treatmentStartTime.getTime() + treatmentDuration * 60000 // Convert minutes to milliseconds
       );
 
-      // If treatment time has passed, auto-discharge
-      if (currentTime >= treatmentEndTime) {
-        await prisma.patientCase.update({
+      // If treatment time has passed or duration is zero/negative, auto-discharge
+      if (treatmentDuration <= 0 || currentTime >= treatmentEndTime) {
+        const updatedCase = await prisma.patientCase.update({
           where: { id: patientCase.id },
           data: {
             status: "DISCHARGED",
@@ -697,8 +776,63 @@ export const autoDischargeCompletedTreatments = async () => {
           },
         });
 
+        // Create discharge log entry
+        const patientData = await prisma.patient.findUnique({
+          where: { id: updatedCase.patient_id }
+        });
+        
+        // Get the last IN_TREATMENT log to retrieve the frozen current_wait_time
+        const lastTreatmentLog = await prisma.caseLog.findFirst({
+          where: { 
+            case_id: updatedCase.id,
+            status: "IN_TREATMENT"
+          },
+          orderBy: { timestamp: "desc" }
+        });
+        
+        const totalTimeInSystem = Math.floor(
+          (currentTime.getTime() - updatedCase.arrival_time.getTime()) / 60000
+        );
+        
+        // Use frozen wait time from when patient entered treatment
+        const currentWaitTime = lastTreatmentLog?.current_wait_time ?? totalTimeInSystem;
+        
+        // Calculate treatment time: total time - wait time
+        const treatmentTime = totalTimeInSystem - currentWaitTime;
+        
+        const diseaseData = updatedCase.disease_code 
+          ? await prisma.disease.findUnique({ where: { code: updatedCase.disease_code } })
+          : null;
+        let maxWaitTime = diseaseData?.max_wait_time ?? updatedCase.max_wait_time ?? null;
+        if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
+        if (isNaN(maxWaitTime)) maxWaitTime = null;
+        
+  const escalation = maxWaitTime !== null ? currentWaitTime > maxWaitTime : false;
+        
+        const vitalFields = extractVitalsForLogging(updatedCase.vitals || {});
+        
+        await createCaseLog({
+          patientId: updatedCase.patient_id,
+          caseId: updatedCase.id,
+          zone: updatedCase.zone,
+          diseaseCode: updatedCase.disease_code,
+          priority: updatedCase.priority,
+          age: updatedCase.age,
+          sex: patientData.gender,
+          SI: updatedCase.si,
+          NEWS2: updatedCase.news2,
+          ...vitalFields,
+          resource_score: updatedCase.resource_score,
+          max_wait_time: maxWaitTime,
+          current_wait_time: currentWaitTime,
+          total_time_in_system: totalTimeInSystem,
+          escalation,
+          treatment_time: treatmentTime,
+          status: "DISCHARGED",
+        });
+
         console.log(
-          `Auto-discharged patient ${patientCase.id} after ${patientCase.treatment_duration} minutes of treatment`
+          `Auto-discharged patient ${patientCase.id} after ${treatmentDuration} minutes of treatment (logged)`
         );
         discharged++;
       }

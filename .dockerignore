@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+*.md
+.env.example
+.vscode
+dist
+build
+Frontend/node_modules
+Frontend/dist
+Frontend/build
+.DS_Store
+*.log
