@@ -1,4 +1,4 @@
-// NEWS2 calculation based on standard scoring rules
+// NEWS2 calculation matching frontend logic
 // Inputs expected:
 // {
 //   respiratory_rate: number,            // breaths/min
@@ -25,53 +25,77 @@ export function calculateNEWS2(vitals) {
 
   let score = 0;
 
-  // Respiratory rate
-  if (respiratory_rate <= 8) score += 3;
-  else if (respiratory_rate <= 11) score += 1;
-  else if (respiratory_rate <= 20) score += 0;
-  else if (respiratory_rate <= 24) score += 2;
-  else score += 3;
+  // Respiratory Rate
+  if (respiratory_rate <= 8 || respiratory_rate >= 30) {
+    score += 3; // RED
+  } else if (respiratory_rate >= 25 && respiratory_rate <= 29) {
+    score += 2; // ORANGE
+  } else if (respiratory_rate >= 21 && respiratory_rate <= 24) {
+    score += 1; // YELLOW
+  }
+  // 12-20 = 0 points (GREEN)
 
-  // Oxygen saturation (SpO2) with O2 supplement adds +2 and uses scale 1
+  // SpO2
+  if (oxygen_saturation < 85) {
+    score += 3; // RED
+  } else if (oxygen_saturation >= 85 && oxygen_saturation <= 89) {
+    score += 2; // ORANGE
+  } else if (oxygen_saturation >= 90 && oxygen_saturation <= 93) {
+    score += 1; // YELLOW
+  }
+  // >= 94 = 0 points (GREEN)
+
+  // Supplemental O2
   if (supplemental_oxygen) {
-    score += 2; // Supplemental oxygen
-    if (oxygen_saturation <= 83) score += 3;
-    else if (oxygen_saturation <= 85) score += 2;
-    else if (oxygen_saturation <= 87) score += 1;
-    else if (oxygen_saturation <= 92) score += 0;
-    else if (oxygen_saturation <= 94) score += 1;
-    else if (oxygen_saturation <= 96) score += 2;
-    else score += 3;
-  } else {
-    if (oxygen_saturation <= 91) score += 3;
-    else if (oxygen_saturation <= 93) score += 2;
-    else if (oxygen_saturation <= 95) score += 1;
+    score += 3;
   }
 
-  // Temperature
-  if (temperature <= 35.0) score += 3;
-  else if (temperature <= 36.0) score += 1;
-  else if (temperature <= 38.0) score += 0;
-  else if (temperature <= 39.0) score += 1;
-  else score += 2;
+  // Systolic BP
+  if (systolic_bp <= 90 || systolic_bp >= 220) {
+    score += 3; // RED
+  } else if ((systolic_bp >= 91 && systolic_bp <= 100) || 
+             (systolic_bp >= 201 && systolic_bp <= 219)) {
+    score += 2; // ORANGE
+  } else if ((systolic_bp >= 101 && systolic_bp <= 110) || 
+             (systolic_bp >= 181 && systolic_bp <= 200)) {
+    score += 1; // YELLOW
+  }
+  // 111-180 = 0 points (GREEN)
 
-  // Systolic blood pressure
-  if (systolic_bp <= 90) score += 3;
-  else if (systolic_bp <= 100) score += 2;
-  else if (systolic_bp <= 110) score += 1;
-  else if (systolic_bp <= 219) score += 0;
-  else score += 3;
+  // Heart Rate (Pulse)
+  if (heart_rate <= 40 || heart_rate >= 130) {
+    score += 3; // RED
+  } else if ((heart_rate >= 41 && heart_rate <= 50) || 
+             (heart_rate >= 111 && heart_rate <= 129)) {
+    score += 2; // ORANGE
+  } else if ((heart_rate >= 51 && heart_rate <= 90) || 
+             (heart_rate >= 101 && heart_rate <= 110)) {
+    score += 1; // YELLOW
+  }
+  // 91-100 = 0 points (GREEN)
 
-  // Heart rate
-  if (heart_rate <= 40) score += 3;
-  else if (heart_rate <= 50) score += 1;
-  else if (heart_rate <= 90) score += 0;
-  else if (heart_rate <= 110) score += 1;
-  else if (heart_rate <= 130) score += 2;
-  else score += 3;
+  // Temperature (in Celsius)
+  if (temperature <= 35.0 || temperature >= 39.1) {
+    score += 3; // RED
+  } else if ((temperature >= 35.1 && temperature <= 36.0) || 
+             (temperature >= 38.1 && temperature <= 39.0)) {
+    score += 2; // ORANGE
+  } else if ((temperature >= 36.1 && temperature <= 36.9) || 
+             (temperature >= 37.5 && temperature <= 38.0)) {
+    score += 1; // YELLOW
+  }
+  // 37.0-37.4 = 0 points (GREEN)
 
-  // Consciousness level: AVPU (anything other than ALERT scores 3)
-  if (consciousness_level !== "ALERT") score += 3;
+  // Consciousness Level (ACVPU mapped)
+  // P or U = 3, V = 2, C = 1, A = 0
+  if (consciousness_level === "PAIN" || consciousness_level === "UNRESPONSIVE") {
+    score += 3; // RED
+  } else if (consciousness_level === "VOICE") {
+    score += 2; // ORANGE
+  } else if (consciousness_level === "CONFUSED" || consciousness_level === "CVPU") {
+    score += 1; // YELLOW
+  }
+  // ALERT = 0 points (GREEN)
 
   // Bound between 0 and 20
   return Math.min(20, Math.max(0, score | 0));

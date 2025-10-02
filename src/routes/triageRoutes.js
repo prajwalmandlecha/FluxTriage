@@ -5,6 +5,7 @@ import {
   getWaitingQueues,
   sendToTreatment,
   dischargePatient,
+  updateTreatmentDuration,
   triggerFillTreatmentSlots,
   getTreatmentQueueStatus,
   triggerAutoDischarge,
@@ -21,6 +22,7 @@ router.get("/queues/treatment/status", getTreatmentQueueStatus);
 router.get("/queues/waiting/status", getWaitingQueueStatus);
 router.post("/treatment", sendToTreatment);
 router.post("/discharge", dischargePatient);
+router.post("/treatment/update-duration", updateTreatmentDuration);
 router.post("/discharge/allCompleted", triggerAutoDischarge);
 router.post("/treatment/fill", triggerFillTreatmentSlots);
 router.get("/logs/:caseId", getLogsByCase);

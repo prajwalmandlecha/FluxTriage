@@ -1,8 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+/**
+ * Prisma Schema for Triage Management System
+ * 
+ * This schema defines the database structure for an Emergency Department (ED) triage system
+ * that prioritizes patients based on vital signs, disease severity, and wait times.
+ * Includes comprehensive logging for machine learning analysis of patient flow and outcomes.
+ */
 
 generator client {
   provider = "prisma-client-js"
@@ -13,95 +15,96 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Patient{
-  id String @id @default(cuid())
-  name String
-  age Int
-  gender Gender
-  phone String 
-  email String?
-  medical_history Json?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  cases PatientCase[] @relation("PatientToCases")
+/**
+ * Patient demographic information
+ * 
+ * Stores basic patient demographics. A patient can have multiple cases (visits) over time.
+ * The unique constraint on [name, dateOfBirth] prevents duplicate patient records while
+ * allowing same-name patients with different birth dates.
+ */
+model Patient {
+  id          String        @id @default(cuid())
+  name        String        // Full name (first + last)
+  age         Int           // Age in years at time of record creation
+  gender      Gender        // Biological sex for medical assessment
+  phone       String        // Contact number (used for patient lookup)
+  dateOfBirth String        // ISO date string for accurate age calculation
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  cases       PatientCase[]
+  logs        CaseLog[]
+
+  @@unique([name, dateOfBirth])  // Prevent duplicate patients
+  @@index([phone])                // Fast lookup by phone number
+  @@index([name])                 // Fast lookup by name
 }
 
+/**
+ * PatientCase represents a single ED visit/encounter
+ * 
+ * Each case tracks the patient's journey through the ED including:
+ * - Triage assessment (zone, NEWS2, SI scores)
+ * - Priority calculations for treatment ordering
+ * - Current status and timestamps
+ * - Disease/diagnosis information
+ * 
+ * Note: max_wait_time is stored here for manual entries without disease codes.
+ * For cases with disease_code, the max_wait_time comes from the Disease table.
+ */
 model PatientCase {
-  id                    String       @id @default(cuid())
-  zone                  Zone
-  si                    Int          // Severity Index (1–4)
-  news2                 Int          // NEWS2 Score (0–20)
-  resource_score        Float
-  age                   Int
-  vitals                Json?
-  
-  priority              Float
-  treatment_duration Int?  
-  status                CaseStatus   @default(WAITING)
+  id                 String      @id @default(cuid())
+  zone               Zone        // Triage zone assignment (RED/ORANGE/YELLOW/GREEN)
+  si                 Int         // Severity Index (1-4): disease-based severity
+  news2              Int         // NEWS2 Score (0-20): vital signs-based severity
+  resource_score     Float       // Resource consumption estimate (1.0-5.0)
+  age                Int         // Age at time of admission (denormalized for quick access)
+  vitals             Json?       // Complete vitals snapshot in standardized backend format
+  symptoms           String?     // Patient-reported or observed symptoms
+  diagnosis          String?     // Clinical diagnosis (disease name)
+  priority           Float       // Calculated priority score for queue ordering
+  treatment_duration Int?        // Estimated treatment time in minutes
+  max_wait_time      Int?        // Maximum acceptable wait before treatment (minutes)
+  status             CaseStatus  @default(WAITING)
+  arrival_time       DateTime    // When patient first registered in ED
+  last_eval_time     DateTime    // Last time priority was recalculated
+  time_served        DateTime?   // When patient completed treatment/was discharged
+  disease_code       String?     // ICD-10 or other standard disease code
+  disease            Disease?    @relation(fields: [disease_code], references: [code], onDelete: SetNull)
+  patient_id         String
+  patient            Patient     @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  logs               CaseLog[]
 
-  //
-  arrival_time          DateTime
-  last_eval_time        DateTime
-  time_served           DateTime?
-
-  //
-  disease_code          String?      // e.g., ICD-10 code
-  disease              Disease?     @relation(fields: [disease_code], references: [code])
-
-  //
-  // assigned_bed          Beds?        @relation("BedToPatientCase")
-  //
-  patient_id            String
-  patient               Patient      @relation("PatientToCases", fields: [patient_id], references: [id])
-
-  // Logs relation
-  logs                 CaseLog[]
-
-  @@index([zone, status])
-  @@index([patient_id])
-  @@index([time_served])
+  @@index([zone, status])        // Query waiting patients by zone
+  @@index([patient_id])          // Lookup all cases for a patient
+  @@index([time_served])         // Query discharged patients
+  @@index([priority])            // Order treatment queue
 }
 
+/**
+ * Disease catalog with standard codes (ICD-10, etc.)
+ */
 model Disease {
-  id             String @id @default(cuid())
-  code           String @unique  // e.g., "J18.9", "I21.9"
-  name           String
-  description    String?
-  treatment_time Int    // in minutes
-  max_wait_time  Int    // max acceptable wait (minutes)
-  severity       Int    // 1–4 or 1–5 scale
-  patientCases   PatientCase[] 
+  id             String        @id @default(cuid())
+  code           String        @unique  // ICD-10 or other standard code (e.g., "J18.9", "I21.9")
+  name           String        // Human-readable disease name
+  description    String?       // Additional clinical details (optional)
+  treatment_time Int           // Expected treatment duration in minutes
+  max_wait_time  Int           // Maximum acceptable wait before treatment (minutes)
+  severity       Int           // Severity scale 1-4 (maps to triage zones)
+  patientCases   PatientCase[] // Cases diagnosed with this disease
 }
 
-
-// model Beds {
-//   id String @id @default(cuid()) 
-//   bed_number String @unique
-//   zone Zone 
-//   case_id String? @unique  
-//   patient_case PatientCase? @relation("BedToPatientCase", fields: [case_id], references: [id])
-//   assigned_at DateTime? 
-// }
-
-
+// Case status workflow: WAITING → IN_TREATMENT → DISCHARGED
 enum CaseStatus {
   WAITING
   IN_TREATMENT
   DISCHARGED
-  TRANSFERRED
-}
-
-enum Action {
-  ASSIGN_BED
-  RELEASE_BED
-  EXTEND_BED
-  OVERRIDE_PRIORITY
 }
 
 enum Zone {  
   RED
   ORANGE
-  YELLOW 
+  YELLOW
   GREEN
 }
 
@@ -111,42 +114,54 @@ enum Gender {
   OTHER
 }
 
-// Logging models
+/**
+ * CaseLog: Time-series log entries for patient case tracking
+ * 
+ * MULTIPLE CaseLogs per PatientCase, capturing state at different time points:
+ * - On patient arrival (initial triage)
+ * - Every 2 minutes during priority recalculation (for waiting patients)
+ * - When transferred to treatment queue
+ * - When discharged from ED
+ * 
+ * Each log is a complete snapshot of the patient's state at that moment in time,
+ * enabling time-series analysis of patient flow, priority changes, and wait times.
+ * 
+ * Design rationale:
+ * - Time-series data for ML analysis of triage effectiveness
+ * - Track priority score evolution over wait time
+ * - Audit trail showing exactly when priority recalculations occurred
+ * - Detect escalation patterns (when wait time exceeds max_wait_time)
+ */
 model CaseLog {
-  id                    String       @id @default(cuid())
-  case_id               String
-  patient_case          PatientCase  @relation(fields: [case_id], references: [id])
-  patient_id            String
-  zone                  Zone
-  age                   Int
-  age_factor            Int
-  arrival_time          DateTime
-  disease_code          String?
-  treatment_start_time  DateTime?
-  treatment_end_time    DateTime?
-  total_time_in_ed      Int?
-  escalation            Boolean?     @default(false)
-  outcome               String?
-  created_at            DateTime     @default(now())
-  updates               CaseUpdate[]
+  id                   String     @id @default(cuid()) @map("log_id")
+  patient_id           String
+  patient              Patient    @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  case_id              String
+  case                 PatientCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  timestamp            DateTime   @default(now())
+  zone                 Zone
+  disease_code         String?
+  priority             Float
+  age                  Int
+  sex                  Gender
+  SI                   Float
+  NEWS2                Int
+  respiratory_rate     Int
+  spo2                 Int
+  o2_device            String
+  bp_systolic          Int
+  pulse_rate           Int
+  consciousness        String
+  temperature          Float
+  resource_score       Float
+  max_wait_time        Int?
+  current_wait_time    Int
+  total_time_in_system Int
+  escalation           Boolean    @default(false)
+  treatment_time       Int?
+  status               String
 
   @@index([case_id])
   @@index([patient_id])
-}
-
-model CaseUpdate {
-  id              String   @id @default(cuid())
-  case_log_id     String
-  case_log        CaseLog  @relation(fields: [case_log_id], references: [id])
-  timestamp       DateTime @default(now())
-  vitals_json     Json
-  news2           Int
-  si              Int
-  resourceScore   Float
-  priority        Float
-  waiting_time    Int
-  rank_in_queue   Int?
-  status          CaseStatus
-
-  @@index([case_log_id])
+  @@index([timestamp])
 }
