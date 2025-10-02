@@ -60,6 +60,9 @@ model PatientCase {
   @@index([zone, status])
   @@index([patient_id])
   @@index([time_served])
+  @@index([status, zone])
+  @@index([priority]) 
+  @@index([status, last_eval_time]) // For auto-discharge
 }
 
 model Disease {
@@ -149,5 +152,5 @@ model CaseUpdate {
   rank_in_queue   Int?
   status          CaseStatus
 
-  @@index([case_log_id])
+  @@index([case_log_id, timestamp])
 }

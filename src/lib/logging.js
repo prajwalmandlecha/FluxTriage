@@ -1,5 +1,6 @@
 import prisma from "./prisma.js";
 
+//create basic patient logs
 export async function createCaseLog({
   caseId,
   patientId,
@@ -22,6 +23,7 @@ export async function createCaseLog({
   });
 }
 
+//detailed logs of vitals,news2 score etc.
 export async function appendCaseUpdate({
   caseLogId,
   vitals,
@@ -33,25 +35,30 @@ export async function appendCaseUpdate({
   rankInQueue,
   status,
 }) {
-  // Fetch context for derived fields required by the logging spec
   const caseLog = await prisma.caseLog.findUnique({ where: { id: caseLogId } });
 
   let maxWaitTime = null;
   let diseaseCode = caseLog?.disease_code ?? null;
+  //get max wait time from disease if available
   if (diseaseCode) {
     try {
       const disease = await prisma.disease.findUnique({
         where: { code: diseaseCode },
       });
       if (disease) maxWaitTime = disease.max_wait_time;
-    } catch (_) {}
+    } catch (_) {
+      // console.error("Error fetching disease in appendCaseUpdate:", error);
+    }
   }
 
+  
   const now = new Date();
   const arrivalTime = caseLog?.arrival_time
     ? new Date(caseLog.arrival_time)
     : null;
 
+
+  //total time in system
   let totalTimeInSystem = null;
   if (typeof caseLog?.total_time_in_ed === "number") {
     totalTimeInSystem = caseLog.total_time_in_ed;
@@ -61,6 +68,7 @@ export async function appendCaseUpdate({
     );
   }
 
+  //treatment time (from arrival to treatment start)
   let treatmentTime = null;
   if (caseLog?.treatment_start_time && arrivalTime) {
     const start = new Date(caseLog.treatment_start_time);
@@ -70,7 +78,7 @@ export async function appendCaseUpdate({
     );
   }
 
-  // Escalation when current wait exceeds max wait
+  // escalation when current wait exceeds max wait
   let escalation = false;
   if (maxWaitTime != null && typeof waitingMinutes === "number") {
     escalation = waitingMinutes > maxWaitTime;
@@ -99,7 +107,7 @@ export async function appendCaseUpdate({
     } catch (_) {}
   }
 
-  // Build spec-aligned vitals payload (while retaining raw vitals)
+  // vital strucuture for ml part
   const normalizedVitals = vitals && typeof vitals === "object" ? vitals : {};
   const specVitals = {
     NEWS2: news2,
@@ -164,6 +172,7 @@ export async function setOutcomeAndTotals({
     },
   });
 }
+
 
 export async function getCaseLogs(caseId) {
   return prisma.caseLog.findFirst({

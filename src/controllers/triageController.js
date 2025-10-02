@@ -9,6 +9,7 @@ import {
   setOutcomeAndTotals,
 } from "../lib/logging.js";
 
+//assign zone based on NEWS2 and SI
 const assignZone = (news2, si) => {
   if (news2 >= 7 || si === 4) return "RED";
   if (news2 >= 5 || si === 3) return "ORANGE";
@@ -16,6 +17,7 @@ const assignZone = (news2, si) => {
   return "GREEN";
 };
 
+//zone weights
 const Zones = {
   RED: { wNEWS2: 0.4, wSI: 0.3, wT: 0.0, wR: 0.2, wA: 0.1 },
   ORANGE: { wNEWS2: 0.35, wSI: 0.25, wT: 0.05, wR: 0.25, wA: 0.1 },
@@ -23,6 +25,7 @@ const Zones = {
   GREEN: { wNEWS2: 0.1, wSI: 0.1, wT: 0.3, wR: 0.2, wA: 0.3 },
 };
 
+//treatment capacities
 const TreatmentCapacity = {
   RED: 5,
   ORANGE: 8,
@@ -30,6 +33,7 @@ const TreatmentCapacity = {
   GREEN: 15,
 };
 
+//check zone capacity
 const checkZoneCapacity = async (zone) => {
   const currentInTreatment = await prisma.patientCase.count({
     where: {
@@ -141,7 +145,9 @@ export const createCase = async (req, res) => {
       status: "WAITING",
     });
 
-    await recalculateAllPriorities();
+    //temporary disable
+    // await recalculateAllPriorities();
+
     // Attempt to fill treatment slots immediately if capacity is available
     await fillTreatmentSlots();
 
@@ -165,6 +171,7 @@ export const getWaitingQueues = async (req, res) => {
       });
 
       const now = new Date();
+      //calculate times
       const cases = rawCases.map((c) => {
         const minutesWaited = Math.floor(
           (now.getTime() - new Date(c.arrival_time).getTime()) / 60000
@@ -174,7 +181,6 @@ export const getWaitingQueues = async (req, res) => {
         const overdueBy =
           exceeded && maxWait != null ? minutesWaited - maxWait : 0;
 
-        // Strip relation object to avoid changing response shape too much
         const { disease, ...rest } = c;
         return {
           ...rest,
@@ -212,6 +218,7 @@ export const getTreatmentQueues = async (req, res) => {
         include: { patient: true },
       });
 
+      //minutes remaining
       const now = new Date();
       const cases = rawCases
         .map((c) => {
@@ -251,6 +258,7 @@ export const getTreatmentQueues = async (req, res) => {
   }
 };
 
+//if zone has space, move case to treatment
 export const sendToTreatment = async (req, res) => {
   try {
     const { caseId } = req.body;
@@ -628,13 +636,17 @@ export const recalculateAllPriorities = async () => {
   }
 };
 
+const refreshData = async () => {
+  autoDischargeCompletedTreatments();
+  recalculateAllPriorities();
+  fillTreatmentSlots();
+};
+
 export const startPriorityScheduler = () => {
-  const minutes = 1;
+  const minutes = 5;
   cron.schedule(`*/${minutes} * * * *`, () => {
     console.log("Running scheduled priority recalculation...");
-    autoDischargeCompletedTreatments();
-    recalculateAllPriorities();
-    fillTreatmentSlots();
+    refreshData();
   });
 
   console.log(`Priority scheduler started - will run every ${minutes} minutes`);
