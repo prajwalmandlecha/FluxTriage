@@ -141,21 +141,38 @@ export const getWaitingQueues = async (req, res) => {
     const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
     const queues = {};
 
-    for (const zone of zones) {
-      const rawCases = await prisma.patientCase.findMany({
-        where: { zone, status: "WAITING" },
-        orderBy: { priority: "desc" },
-        include: { 
-          patient: true,
-          disease: true  // Include disease data for max_wait_time
-        },
-      });
+      for (const zone of zones) {
+        const rawCases = await prisma.patientCase.findMany({
+          where: { zone, status: "WAITING" },
+          orderBy: { priority: "desc" },
+          include: {
+            patient: true,
+            disease: true, // Include disease data for max_wait_time
+          },
+        });
 
-      queues[zone] = {
-        cases,
-        count: cases.length,
-      };
-    }
+        const now = new Date();
+        const cases = rawCases.map((patientCase) => {
+          const arrival = new Date(patientCase.arrival_time);
+          const waitingMinutes = Math.max(
+            0,
+            Math.floor((now.getTime() - arrival.getTime()) / 60000)
+          );
+
+          const maxWait = patientCase.disease?.max_wait_time ?? patientCase.max_wait_time ?? null;
+
+          return {
+            ...patientCase,
+            waiting_minutes: waitingMinutes,
+            max_wait_time: maxWait,
+          };
+        });
+
+        queues[zone] = {
+          cases,
+          count: cases.length,
+        };
+      }
 
     return res.status(200).json({
       message: "Waiting queues fetched successfully",
@@ -175,45 +192,25 @@ export const getTreatmentQueues = async (req, res) => {
     for (const zone of zones) {
       const rawCases = await prisma.patientCase.findMany({
         where: { zone, status: "IN_TREATMENT" },
-        include: { 
+        include: {
           patient: true,
-          disease: true  // Include disease data for max_wait_time and treatment_time
+          disease: true, // Include disease data for max_wait_time and treatment_time
         },
       });
 
-      const currentTime = new Date();
-      
-      // Calculate remaining treatment time for each case and add it to the case object
-      const casesWithRemainingTime = cases.map(patientCase => {
-        const treatmentStartTime = patientCase.last_eval_time;
-        const treatmentDuration = patientCase.treatment_duration ?? 0;
-        const elapsedTime = Math.floor(
-          (currentTime.getTime() - treatmentStartTime.getTime()) / 60000
-        );
-        const remainingTime = Math.max(0, treatmentDuration - elapsedTime);
-        
-        return {
-          ...patientCase,
-          remainingTreatmentTime: remainingTime
-        };
-      });
-      
-      // Sort by remaining treatment time (ascending - least time remaining first)
-      casesWithRemainingTime.sort((a, b) => a.remainingTreatmentTime - b.remainingTreatmentTime);
-
-      //minutes remaining
       const now = new Date();
-      const cases = rawCases
-        .map((c) => {
-          const startedAt = new Date(c.last_eval_time);
+      const casesWithRemainingTime = rawCases
+        .map((patientCase) => {
+          const startedAt = new Date(patientCase.last_eval_time);
           const elapsedMinutes = Math.max(
             0,
             Math.floor((now.getTime() - startedAt.getTime()) / 60000)
           );
-          const totalDuration = c.treatment_duration || 0;
+          const totalDuration = patientCase.treatment_duration || 0;
           const remaining = Math.max(0, totalDuration - elapsedMinutes);
+
           return {
-            ...c,
+            ...patientCase,
             remaining_treatment_minutes: remaining,
           };
         })
@@ -722,7 +719,7 @@ const refreshData = async () => {
 };
 
 export const startPriorityScheduler = () => {
-  const minutes = 5;
+  const minutes = 1;
   cron.schedule(`*/${minutes} * * * *`, () => {
     console.log("Running scheduled priority recalculation...");
     refreshData();

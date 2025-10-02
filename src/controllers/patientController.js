@@ -1,6 +1,10 @@
 import prisma from "../lib/prisma.js";
 import { calculateNEWS2 } from "../lib/news2.js";
-import { assignZone, calculatePriorityScore, calculateAgeFactor } from "../lib/priority.js";
+import {
+  assignZone,
+  calculatePriorityScore,
+  calculateAgeFactor,
+} from "../lib/priority.js";
 import { vitalsToBackend } from "../lib/vitalsMapping.js";
 import { createCaseLog } from "../lib/logging.js";
 
@@ -23,9 +27,11 @@ function extractVitalsForLogging(vitals) {
 export const getPatients = async (req, res) => {
   try {
     const patients = await prisma.patient.findMany({
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: "desc" },
     });
-    res.status(200).json({ message: "Patients fetched successfully", data: patients });
+    res
+      .status(200)
+      .json({ message: "Patients fetched successfully", data: patients });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -36,12 +42,14 @@ export const getPatientById = async (req, res) => {
     const { id } = req.params;
     const patient = await prisma.patient.findUnique({
       where: { id },
-      include: { cases: { orderBy: { arrival_time: 'desc' } } }
+      include: { cases: { orderBy: { arrival_time: "desc" } } },
     });
     if (!patient) {
       return res.status(404).json({ message: "Patient not found" });
     }
-    res.status(200).json({ message: "Patient fetched successfully", data: patient });
+    res
+      .status(200)
+      .json({ message: "Patient fetched successfully", data: patient });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -53,25 +61,27 @@ export const searchPatientByPhone = async (req, res) => {
     if (!phone) {
       return res.status(400).json({ message: "Phone number is required" });
     }
-    
-    const patient = await prisma.patient.findUnique({
+
+    const patient = await prisma.patient.findFirst({
       where: { phone },
-      include: { 
-        cases: { 
-          orderBy: { arrival_time: 'desc' },
-          take: 5 
-        } 
-      }
+      include: {
+        cases: {
+          orderBy: { arrival_time: "desc" },
+          take: 5,
+        },
+      },
     });
-    
+
     if (!patient) {
-      return res.status(404).json({ message: "Patient not found", exists: false });
+      return res
+        .status(404)
+        .json({ message: "Patient not found", exists: false });
     }
-    
-    res.status(200).json({ 
-      message: "Patient found", 
+
+    res.status(200).json({
+      message: "Patient found",
       exists: true,
-      data: patient 
+      data: patient,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -82,30 +92,32 @@ export const searchPatientByName = async (req, res) => {
   try {
     const { name } = req.query;
     if (!name || name.length < 2) {
-      return res.status(400).json({ message: "Name must be at least 2 characters" });
+      return res
+        .status(400)
+        .json({ message: "Name must be at least 2 characters" });
     }
-    
+
     const patients = await prisma.patient.findMany({
       where: {
         name: {
           contains: name,
-          mode: 'insensitive'
-        }
+          mode: "insensitive",
+        },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       take: 10,
       include: {
         cases: {
-          orderBy: { arrival_time: 'desc' },
-          take: 1
-        }
-      }
+          orderBy: { arrival_time: "desc" },
+          take: 1,
+        },
+      },
     });
-    
-    res.status(200).json({ 
-      message: "Patients found", 
+
+    res.status(200).json({
+      message: "Patients found",
       count: patients.length,
-      data: patients 
+      data: patients,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -115,34 +127,36 @@ export const searchPatientByName = async (req, res) => {
 export const createPatient = async (req, res) => {
   try {
     const { name, age, gender, phone, dateOfBirth } = req.body;
-    
+
     if (!name || !age || !gender || !phone || !dateOfBirth) {
       return res.status(400).json({ message: "Missing required fields" });
     }
-    
+
     // Check if patient already exists by phone
-    const existingPatient = await prisma.patient.findUnique({
-      where: { phone }
+    const existingPatient = await prisma.patient.findFirst({
+      where: { phone },
     });
-    
+
     if (existingPatient) {
-      return res.status(409).json({ 
+      return res.status(409).json({
         message: "Patient with this phone number already exists",
-        data: existingPatient 
+        data: existingPatient,
       });
     }
-    
+
     const patient = await prisma.patient.create({
-      data: { 
-        name, 
-        age: parseInt(age), 
-        gender, 
-        phone, 
-        dateOfBirth
+      data: {
+        name,
+        age: parseInt(age),
+        gender,
+        phone,
+        dateOfBirth,
       },
     });
-    
-    res.status(201).json({ message: "Patient created successfully", data: patient });
+
+    res
+      .status(201)
+      .json({ message: "Patient created successfully", data: patient });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -151,7 +165,7 @@ export const createPatient = async (req, res) => {
 // Unified endpoint: Check if patient exists, create if not, then create case
 export const addPatientToED = async (req, res) => {
   try {
-    const { 
+    const {
       // Patient info
       firstName,
       lastName,
@@ -166,23 +180,25 @@ export const addPatientToED = async (req, res) => {
       diseaseCode,
       severityIndex,
       resourceScore,
-      maxWaitingTime,  // Optional: for manual disease entry
-      estimatedTreatmentTime  // Optional: for manual disease entry
+      maxWaitingTime, // Optional: for manual disease entry
+      estimatedTreatmentTime, // Optional: for manual disease entry
     } = req.body;
-    
+
     // Handle optional symptoms field
     const symptomsValue = symptoms || null;
 
     // Validation with detailed error messages
     if (!firstName || !lastName || !age || !gender || !phone || !dateOfBirth) {
       const missingFields = [];
-      if (!firstName) missingFields.push('firstName');
-      if (!lastName) missingFields.push('lastName');
-      if (!age) missingFields.push('age');
-      if (!gender) missingFields.push('gender');
-      if (!phone) missingFields.push('phone');
-      if (!dateOfBirth) missingFields.push('dateOfBirth');
-      return res.status(400).json({ message: `Missing required patient fields: ${missingFields.join(', ')}` });
+      if (!firstName) missingFields.push("firstName");
+      if (!lastName) missingFields.push("lastName");
+      if (!age) missingFields.push("age");
+      if (!gender) missingFields.push("gender");
+      if (!phone) missingFields.push("phone");
+      if (!dateOfBirth) missingFields.push("dateOfBirth");
+      return res.status(400).json({
+        message: `Missing required patient fields: ${missingFields.join(", ")}`,
+      });
     }
     if (!vitals) {
       return res.status(400).json({ message: "Missing required vitals" });
@@ -196,12 +212,12 @@ export const addPatientToED = async (req, res) => {
 
     // Check if patient exists by name and DOB (composite key)
     let patient = await prisma.patient.findUnique({
-      where: { 
+      where: {
         name_dateOfBirth: {
           name,
-          dateOfBirth
-        }
-      }
+          dateOfBirth,
+        },
+      },
     });
 
     let patientExists = false;
@@ -213,8 +229,8 @@ export const addPatientToED = async (req, res) => {
           age: ageInt,
           gender: gender.toUpperCase(),
           phone,
-          dateOfBirth
-        }
+          dateOfBirth,
+        },
       });
     } else {
       patientExists = true;
@@ -224,8 +240,8 @@ export const addPatientToED = async (req, res) => {
         data: {
           age: ageInt,
           gender: gender.toUpperCase(),
-          phone
-        }
+          phone,
+        },
       });
     }
 
@@ -233,12 +249,10 @@ export const addPatientToED = async (req, res) => {
     let backendVitals;
     if (
       vitals &&
-      typeof vitals === 'object' &&
-      (
-        vitals.respiratoryRate !== undefined ||
+      typeof vitals === "object" &&
+      (vitals.respiratoryRate !== undefined ||
         vitals.oxygenSat !== undefined ||
-        vitals.systolicBP !== undefined
-      )
+        vitals.systolicBP !== undefined)
     ) {
       // Frontend format, convert
       backendVitals = vitalsToBackend(vitals);
@@ -253,7 +267,14 @@ export const addPatientToED = async (req, res) => {
     const arrivalTime = new Date();
     const ageFactor = calculateAgeFactor(ageInt);
     const resourceScoreValue = resourceScore || 2.0;
-    const priority = calculatePriorityScore(zone, news2, si, 0, resourceScoreValue, ageInt);
+    const priority = calculatePriorityScore(
+      zone,
+      news2,
+      si,
+      0,
+      resourceScoreValue,
+      ageInt
+    );
 
     // Create case
     const patientCase = await prisma.patientCase.create({
@@ -268,21 +289,21 @@ export const addPatientToED = async (req, res) => {
         symptoms: symptomsValue,
         diagnosis,
         disease_code: diseaseCode,
-        max_wait_time: maxWaitingTime,  // Store max_wait_time for manual entries
-        treatment_duration: estimatedTreatmentTime,  // Store treatment time
+        max_wait_time: maxWaitingTime, // Store max_wait_time for manual entries
+        treatment_duration: estimatedTreatmentTime, // Store treatment time
         priority,
         arrival_time: arrivalTime,
         last_eval_time: arrivalTime,
-        status: 'WAITING'
+        status: "WAITING",
       },
-      include: { patient: true }
+      include: { patient: true },
     });
 
     // Auto-discharge if treatment time is 0
     if (patientCase.treatment_duration === 0) {
       await prisma.patientCase.update({
         where: { id: patientCase.id },
-        data: { status: 'DISCHARGED', time_served: new Date() }
+        data: { status: "DISCHARGED", time_served: new Date() },
       });
     }
 
@@ -290,14 +311,16 @@ export const addPatientToED = async (req, res) => {
     // Get max_wait_time: try disease from DB first, then from PatientCase
     let maxWaitTime = patientCase.max_wait_time;
     if (diseaseCode) {
-      const diseaseFromDb = await prisma.disease.findUnique({ where: { code: diseaseCode } });
+      const diseaseFromDb = await prisma.disease.findUnique({
+        where: { code: diseaseCode },
+      });
       if (diseaseFromDb && diseaseFromDb.max_wait_time !== null) {
         maxWaitTime = diseaseFromDb.max_wait_time;
       }
     }
 
     const vitalFields = extractVitalsForLogging(backendVitals);
-    
+
     await createCaseLog({
       patientId: patient.id,
       caseId: patientCase.id,
@@ -315,16 +338,16 @@ export const addPatientToED = async (req, res) => {
       total_time_in_system: 0,
       escalation: false,
       treatment_time: null,
-      status: 'Waiting',
+      status: "Waiting",
     });
 
-    res.status(201).json({ 
-      message: "Patient added to ED successfully", 
+    res.status(201).json({
+      message: "Patient added to ED successfully",
       patientExists,
       data: {
         patient,
-        case: patientCase
-      }
+        case: patientCase,
+      },
     });
   } catch (error) {
     console.error("Error adding patient to ED:", error);
