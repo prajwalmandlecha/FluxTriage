@@ -90,10 +90,17 @@ export function calculatePriorityScore(
     throw new Error(`Invalid zone: ${zone}`);
   }
 
+  // Only count waitingMinutes after 70% of maxWaitTime (if provided)
+  let effectiveWaiting = waitingMinutes;
+  if (typeof arguments[6] === 'number' && !isNaN(arguments[6])) {
+    const maxWaitTime = arguments[6];
+    const threshold = 0.7 * maxWaitTime;
+    effectiveWaiting = waitingMinutes > threshold ? waitingMinutes - threshold : 0;
+  }
   return (
     weights.wNEWS2 * news2 +
     weights.wSI * si +
-    weights.wT * waitingMinutes +
+    weights.wT * effectiveWaiting +
     weights.wR * resourceScore +
     weights.wA * ageFactor
   );

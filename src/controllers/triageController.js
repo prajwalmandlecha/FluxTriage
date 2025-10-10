@@ -648,13 +648,24 @@ export const recalculateAllPriorities = async () => {
         (currentTime.getTime() - patientCase.arrival_time.getTime()) / 60000
       );
 
+      // Pass maxWaitTime as 7th argument for new logic
+      let recalcMaxWaitTime = null;
+      if (patientCase.disease_code) {
+        const disease = await prisma.disease.findUnique({ where: { code: patientCase.disease_code } });
+        recalcMaxWaitTime = disease?.max_wait_time ?? patientCase.max_wait_time ?? null;
+      } else {
+        recalcMaxWaitTime = patientCase.max_wait_time ?? null;
+      }
+      if (typeof recalcMaxWaitTime === "string") recalcMaxWaitTime = parseFloat(recalcMaxWaitTime);
+      if (isNaN(recalcMaxWaitTime)) recalcMaxWaitTime = null;
       const newPriority = calculatePriorityScore(
         patientCase.zone,
         patientCase.news2,
         patientCase.si,
-        waitingMinutes,  // FIX: Added missing waitingMinutes parameter
+        waitingMinutes,
         patientCase.resource_score,
-        patientCase.age
+        patientCase.age,
+        recalcMaxWaitTime
       );
 
       await prisma.patientCase.update({
