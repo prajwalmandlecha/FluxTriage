@@ -60,10 +60,13 @@ export function calculateNEWS2(vitals) {
     (systolic_bp >= 201 && systolic_bp <= 219)
   ) {
     score += 2;
-  } else if (systolic_bp >= 101 && systolic_bp <= 110) {
+  } else if (
+    (systolic_bp >= 101 && systolic_bp <= 110) ||
+    (systolic_bp >= 181 && systolic_bp <= 200)
+  ) {
     score += 1;
   }
-  // 111-219 = 0 points
+  // 111-180 = 0 points
 
   // Heart Rate (Pulse)
   if (heart_rate <= 40 || heart_rate >= 131) {

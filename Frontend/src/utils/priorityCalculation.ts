@@ -51,7 +51,7 @@ export function calculateNEWS2Score(vitals: Patient["vitals"]): number {
   ) {
     score += 1; // YELLOW
   }
-  // 111-219 = 0 points
+  // 111-180 = 0 points
 
   // Pulse (heart rate, beats per minute)
   // ≤40: +3 | 41-50: +1 | 51-90: 0 | 91-110: +1 | 111-130: +2 | ≥131: +3
@@ -81,18 +81,15 @@ export function calculateNEWS2Score(vitals: Patient["vitals"]): number {
   // 36.1-38.0°C = 0 points
 
   // Consciousness Level (ACVPU)
-  // Alert: 0 | New confusion/agitation, Voice, Pain, Unresponsive: +3
-  if (
-    vitals.consciousness === "P" ||
-    vitals.consciousness === "U" ||
-    vitals.consciousness === "V" ||
-    vitals.consciousness === "C"
-  ) {
+  // Map frontend codes to backend for consistency
+  const c = vitals.consciousness;
+  if (c === "P" || c === "U" || c === "V" || c === "C") {
     score += 3;
   }
   // A (Alert) = 0 points
 
-  return score;
+  // Cap score between 0 and 20 for consistency with backend
+  return Math.min(20, Math.max(0, score | 0));
 }
 
 /**
@@ -107,7 +104,7 @@ export function calculateNEWS2Score(vitals: Patient["vitals"]): number {
 export function determineZoneFromNEWS2(
   news2Score: number
 ): "Red" | "Orange" | "Yellow" | "Green" {
-  if (news2Score >= 7) return "Red"; // Changed from >= 9
+  if (news2Score >= 7) return "Red";
   if (news2Score >= 5) return "Orange";
   if (news2Score >= 2) return "Yellow";
   return "Green";
