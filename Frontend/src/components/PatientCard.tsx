@@ -95,6 +95,21 @@ export function PatientCard({ patient, isDragging, onDragStart, onClick, classNa
             <span>NEWS2: {patient.news2Score}</span>
             <span>Zone: {patient.priority}</span>
           </div>
+          
+          <div className="flex items-center justify-between text-xs">
+            <span className={`font-medium ${
+              patient.status === 'WAITING' ? 'text-amber-600' : 
+              patient.status === 'IN_TREATMENT' ? 'text-green-600' : 
+              'text-gray-600'
+            }`}>
+              {patient.status === 'WAITING' ? 'Waiting' : 
+               patient.status === 'IN_TREATMENT' ? 'In Treatment' : 
+               patient.status}
+            </span>
+            {patient.status === 'IN_TREATMENT' && patient.bedNumber && (
+              <span className="text-blue-600 font-medium">Bed: {patient.bedNumber}</span>
+            )}
+          </div>
         </div>
       </div>
     </Card>

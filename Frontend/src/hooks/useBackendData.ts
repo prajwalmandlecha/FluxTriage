@@ -84,6 +84,7 @@ export function useBackendData() {
       news2Score: caseData.news2 || 0,
       waitingTime,
       treatmentTime,
+      bedNumber: caseData.bed_number || undefined, // Include bed number from backend
       arrivalTime: new Date(caseData.arrival_time),
       contactNumber: patient.phone || '',
       status: caseData.status
@@ -128,35 +129,8 @@ export function useBackendData() {
         const treatmentPatients = treatmentCases
           .filter((c: any) => c.status === 'IN_TREATMENT');
         
-        // Assign stable bed numbers within zone capacity
-        // Strategy: Use the case ID hash to assign beds consistently
-        // This ensures bed numbers stay within 1-maxBeds range
-        const bedNumberMap = new Map<string, number>();
-        const usedBeds = new Set<number>();
-        
-        // Sort by treatment start time for consistent assignment
-        const patientsWithStableBeds = treatmentPatients.map((caseData: any) => {
-          const treatmentStartTime = new Date(caseData.last_eval_time);
-          return { caseData, treatmentStartTime };
-        });
-        patientsWithStableBeds.sort((a, b) => 
-          a.treatmentStartTime.getTime() - b.treatmentStartTime.getTime()
-        );
-        
-        // Assign beds: each patient gets the lowest available bed number
-        for (const item of patientsWithStableBeds) {
-          // Find the lowest available bed number
-          for (let bedNum = 1; bedNum <= config.maxBeds; bedNum++) {
-            if (!usedBeds.has(bedNum)) {
-              bedNumberMap.set(item.caseData.id, bedNum);
-              usedBeds.add(bedNum);
-              break;
-            }
-          }
-        }
-        
-        // Create treatment beds with patients - backend returns them sorted by remaining time
-        // But we use stable bed numbers from the mapping
+        // Use bed numbers from backend (already assigned and persistent)
+        // No need to reassign - backend manages bed numbers
         const treatmentQueue = treatmentPatients.map((caseData: any) => {
           const patient = convertCaseToPatient(caseData);
           // Calculate remaining time: total treatment duration - elapsed time
@@ -165,8 +139,9 @@ export function useBackendData() {
           const totalTreatmentTime = caseData.treatment_duration || 0;
           const remainingTime = Math.max(0, totalTreatmentTime - elapsedMinutes);
           
-          const stableBedNumber = bedNumberMap.get(caseData.id) || 0;
-          const bedNumberStr = `${stableBedNumber}`;
+          // Use bed number from backend (e.g., "RED-01" -> "01")
+          const backendBedNumber = caseData.bed_number || '';
+          const bedNumberStr = backendBedNumber.split('-')[1] || '00';
           
           return {
             id: `${config.priority}-BED-${bedNumberStr}`,
@@ -179,13 +154,23 @@ export function useBackendData() {
         });
         
         // Add empty beds to fill remaining capacity
-        const occupiedBedNumbers = new Set(Array.from(bedNumberMap.values()));
+        // Get occupied bed numbers from backend data
+        const occupiedBedNumbers = new Set(
+          treatmentPatients
+            .map((c: any) => {
+              const bedNum = c.bed_number || '';
+              const numPart = bedNum.split('-')[1];
+              return numPart ? parseInt(numPart, 10) : 0;
+            })
+            .filter((n: number) => n > 0)
+        );
+        
         const emptyBeds = [];
         for (let i = 1; i <= config.maxBeds; i++) {
           if (!occupiedBedNumbers.has(i)) {
             emptyBeds.push({
               id: `${config.priority}-BED-${i}`,
-              bedNumber: `${i}`,
+              bedNumber: `${i.toString().padStart(2, '0')}`,
               caseId: undefined,
               patient: null,
               remainingTime: 0,

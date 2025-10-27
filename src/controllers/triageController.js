@@ -43,6 +43,201 @@ const checkZoneCapacity = async (zone) => {
   return currentInTreatment < TreatmentCapacity[zone];
 };
 
+// Assign bed numbers to existing patients in treatment who don't have one
+const assignBedNumbersToExistingPatients = async (zone) => {
+  const patientsWithoutBeds = await prisma.patientCase.findMany({
+    where: {
+      zone: zone,
+      status: "IN_TREATMENT",
+      bed_number: null
+    },
+    orderBy: { last_eval_time: 'asc' } // First in treatment gets first bed number
+  });
+
+  if (patientsWithoutBeds.length === 0) return;
+
+  // Get currently occupied bed numbers
+  const occupiedBeds = await prisma.patientCase.findMany({
+    where: {
+      zone: zone,
+      status: "IN_TREATMENT",
+      bed_number: { not: null }
+    },
+    select: { bed_number: true }
+  });
+
+  const occupiedBedNumbers = new Set(
+    occupiedBeds
+      .map(case_item => case_item.bed_number)
+      .filter(bedNum => bedNum && bedNum.startsWith(zone))
+  );
+
+  // Assign bed numbers to patients without beds
+  let bedCounter = 1;
+  for (const patient of patientsWithoutBeds) {
+    // Find next available bed number
+    while (bedCounter <= TreatmentCapacity[zone]) {
+      const bedNumber = `${zone}-${bedCounter.toString().padStart(2, '0')}`;
+      if (!occupiedBedNumbers.has(bedNumber)) {
+        await prisma.patientCase.update({
+          where: { id: patient.id },
+          data: { bed_number: bedNumber }
+        });
+        occupiedBedNumbers.add(bedNumber);
+        console.log(`Assigned bed ${bedNumber} to existing patient ${patient.id}`);
+        break;
+      }
+      bedCounter++;
+    }
+    bedCounter++;
+  }
+};
+
+// Get the next available bed number for a specific zone
+const getNextAvailableBedNumber = async (zone) => {
+  // First, assign bed numbers to existing patients who don't have one
+  await assignBedNumbersToExistingPatients(zone);
+
+  // Get all occupied bed numbers for this zone
+  const occupiedBeds = await prisma.patientCase.findMany({
+    where: {
+      zone: zone,
+      status: "IN_TREATMENT",
+      bed_number: { not: null }
+    },
+    select: { bed_number: true }
+  });
+
+  const occupiedBedNumbers = new Set(
+    occupiedBeds
+      .map(case_item => case_item.bed_number)
+      .filter(bedNum => bedNum && bedNum.startsWith(zone))
+  );
+
+  // Find the first available bed number
+  const maxCapacity = TreatmentCapacity[zone];
+  for (let i = 1; i <= maxCapacity; i++) {
+    const bedNumber = `${zone}-${i.toString().padStart(2, '0')}`;
+    if (!occupiedBedNumbers.has(bedNumber)) {
+      return bedNumber;
+    }
+  }
+
+  // If no bed available (shouldn't happen if capacity check is done first)
+  return null;
+};
+
+// Check if a specific patient should immediately go to treatment
+const checkImmediateTreatmentEligibility = async (caseId, zone) => {
+  try {
+    // Check if there's capacity in the zone
+    const hasCapacity = await checkZoneCapacity(zone);
+    if (!hasCapacity) {
+      return { eligible: false, reason: "No treatment capacity" };
+    }
+
+    // Get the highest priority patient in this zone's waiting queue
+    const topPatient = await prisma.patientCase.findFirst({
+      where: {
+        zone: zone,
+        status: "WAITING",
+      },
+      orderBy: { priority: "desc" },
+    });
+
+    // If this patient is the highest priority, they're eligible for immediate treatment
+    if (topPatient && topPatient.id === caseId) {
+      return { eligible: true, reason: "Highest priority with available capacity" };
+    }
+
+    return { eligible: false, reason: "Not highest priority" };
+  } catch (error) {
+    console.error("Error checking treatment eligibility:", error);
+    return { eligible: false, reason: "Error checking eligibility" };
+  }
+};
+
+// Move a specific patient to treatment immediately
+const movePatientToTreatment = async (caseId) => {
+  try {
+    const patientCase = await prisma.patientCase.findUnique({
+      where: { id: caseId },
+      include: { disease: true },
+    });
+
+    if (!patientCase) {
+      return { success: false, message: "Case not found" };
+    }
+
+    // Get the next available bed number
+    const bedNumber = await getNextAvailableBedNumber(patientCase.zone);
+    if (!bedNumber) {
+      return { success: false, message: "No bed available" };
+    }
+
+    let treatmentDuration = 30;
+    if (patientCase.disease && patientCase.disease.treatment_time) {
+      treatmentDuration = patientCase.disease.treatment_time;
+    }
+
+    const treatmentStartTime = new Date();
+    
+    const updatedCase = await prisma.patientCase.update({
+      where: { id: caseId },
+      data: {
+        status: "IN_TREATMENT",
+        treatment_duration: treatmentDuration,
+        last_eval_time: treatmentStartTime,
+        bed_number: bedNumber,
+      },
+    });
+
+    // Create log entry for immediate treatment start
+    const patientData = await prisma.patient.findUnique({
+      where: { id: updatedCase.patient_id }
+    });
+    
+    const currentWaitTime = Math.floor(
+      (treatmentStartTime.getTime() - updatedCase.arrival_time.getTime()) / 60000
+    );
+    const totalTimeInSystem = currentWaitTime;
+    
+    let maxWaitTime = patientCase.disease?.max_wait_time ?? updatedCase.max_wait_time ?? null;
+    if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
+    if (isNaN(maxWaitTime)) maxWaitTime = null;
+    
+    const escalation = maxWaitTime !== null ? currentWaitTime > maxWaitTime : false;
+    
+    const vitalFields = extractVitalsForLogging(updatedCase.vitals || {});
+    
+    await createCaseLog({
+      patientId: updatedCase.patient_id,
+      caseId: updatedCase.id,
+      zone: updatedCase.zone,
+      diseaseCode: updatedCase.disease_code,
+      priority: updatedCase.priority,
+      age: updatedCase.age,
+      sex: patientData.gender,
+      SI: updatedCase.si,
+      NEWS2: updatedCase.news2,
+      ...vitalFields,
+      resource_score: updatedCase.resource_score,
+      max_wait_time: maxWaitTime,
+      current_wait_time: currentWaitTime,
+      total_time_in_system: totalTimeInSystem,
+      escalation,
+      treatment_time: 0,
+      status: "IN_TREATMENT",
+    });
+
+    console.log(`Patient ${caseId} immediately moved to treatment in ${updatedCase.zone} zone`);
+    return { success: true, message: "Patient moved to treatment", data: updatedCase };
+  } catch (error) {
+    console.error("Error moving patient to treatment:", error);
+    return { success: false, message: error.message };
+  }
+};
+
 export const createCase = async (req, res) => {
   try {
     const { id, si, resourceScore, age, disease_code, vitals } = req.body;
@@ -126,8 +321,9 @@ export const createCase = async (req, res) => {
     //temporary disable
     // await recalculateAllPriorities();
 
-    // Attempt to fill treatment slots immediately if capacity is available
-    await fillTreatmentSlots();
+    // Patient created successfully and added to waiting queue
+    // The scheduler will handle priority recalculation and treatment slot assignment every minute
+    console.log(`Patient ${newCase.id} added to ${zone} waiting queue. Scheduler will handle treatment assignment.`);
 
     return res.json({ message: "Case created successfully", data: newCase });
   } catch (error) {
@@ -190,12 +386,16 @@ export const getTreatmentQueues = async (req, res) => {
     const treatmentQueues = {};
 
     for (const zone of zones) {
+      // First ensure all patients in treatment have bed numbers
+      await assignBedNumbersToExistingPatients(zone);
+      
       const rawCases = await prisma.patientCase.findMany({
         where: { zone, status: "IN_TREATMENT" },
         include: {
           patient: true,
           disease: true, // Include disease data for max_wait_time and treatment_time
         },
+        orderBy: { last_eval_time: "asc" }, // Order by treatment start time for consistent bed assignments
       });
 
       const now = new Date();
@@ -212,6 +412,7 @@ export const getTreatmentQueues = async (req, res) => {
           return {
             ...patientCase,
             remaining_treatment_minutes: remaining,
+            // bed_number is now stored in database, no need to generate
           };
         })
         .sort(
@@ -266,6 +467,14 @@ export const sendToTreatment = async (req, res) => {
       where: { code: patientCase.disease_code || "" },
     });
 
+    // Get the next available bed number
+    const bedNumber = await getNextAvailableBedNumber(patientCase.zone);
+    if (!bedNumber) {
+      return res.status(400).json({
+        message: `No bed available in ${patientCase.zone} zone`,
+      });
+    }
+
     let treatmentDuration = 1;
     if (disease && disease.treatment_time) {
       treatmentDuration = disease.treatment_time;
@@ -277,6 +486,7 @@ export const sendToTreatment = async (req, res) => {
         status: "IN_TREATMENT",
         treatment_duration: treatmentDuration,
         last_eval_time: new Date(),
+        bed_number: bedNumber,
       },
     });
 
@@ -352,6 +562,7 @@ export const dischargePatient = async (req, res) => {
         status: "DISCHARGED",
         time_served: new Date(),
         last_eval_time: new Date(),
+        bed_number: null, // Free up the bed
       },
     });
 
@@ -475,103 +686,64 @@ export const updateTreatmentDuration = async (req, res) => {
   }
 };
 
+// Fill treatment slots for a specific zone (used for parallel processing)
+const fillTreatmentSlotsForZone = async (zone) => {
+  try {
+    const currentInTreatment = await prisma.patientCase.count({
+      where: {
+        zone: zone,
+        status: "IN_TREATMENT",
+      },
+    });
+
+    const availableSlots = TreatmentCapacity[zone] - currentInTreatment;
+
+    if (availableSlots <= 0) {
+      return { zone, processed: 0, message: "No available slots" };
+    }
+
+    // Get top waiting cases for this zone
+    const topCases = await prisma.patientCase.findMany({
+      where: {
+        zone: zone,
+        status: "WAITING",
+      },
+      orderBy: { priority: "desc" },
+      take: availableSlots,
+      include: { disease: true },
+    });
+
+    let processedCount = 0;
+
+    for (const patientCase of topCases) {
+      const result = await movePatientToTreatment(patientCase.id);
+      if (result.success) {
+        processedCount++;
+      }
+    }
+
+    return { zone, processed: processedCount, message: `Filled ${processedCount} slots` };
+  } catch (error) {
+    console.error(`Error processing ${zone} zone:`, error);
+    return { zone, processed: 0, error: error.message };
+  }
+};
+
 export const fillTreatmentSlots = async () => {
   try {
     const zones = ["RED", "ORANGE", "YELLOW", "GREEN"];
 
-    for (const zone of zones) {
-      const currentInTreatment = await prisma.patientCase.count({
-        where: {
-          zone: zone,
-          status: "IN_TREATMENT",
-        },
-      });
+    // Process all zones in parallel for true zone independence
+    console.log("Filling treatment slots across all zones in parallel...");
+    const zonePromises = zones.map(zone => fillTreatmentSlotsForZone(zone));
+    const results = await Promise.all(zonePromises);
+    
+    const totalProcessed = results.reduce((sum, r) => sum + r.processed, 0);
+    console.log(`Treatment slots filled - Total processed: ${totalProcessed}`, results);
 
-      const availableSlots = TreatmentCapacity[zone] - currentInTreatment;
-
-      if (availableSlots <= 0) {
-        console.log(`No available slots in ${zone} zone`);
-        continue;
-      }
-
-      console.log(`Filling ${availableSlots} available slots in ${zone} zone`);
-
-      // Get top waiting cases for this zone, include disease to avoid N+1
-      const topCases = await prisma.patientCase.findMany({
-        where: {
-          zone: zone,
-          status: "WAITING",
-        },
-        orderBy: { priority: "desc" },
-        take: availableSlots,
-        include: { disease: true },
-      });
-
-      // Process each case
-      for (const patientCase of topCases) {
-        let treatmentDuration = 30;
-        if (patientCase.disease && patientCase.disease.treatment_time) {
-          treatmentDuration = patientCase.disease.treatment_time;
-        }
-
-        const treatmentStartTime = new Date();
-        
-        const updatedCase = await prisma.patientCase.update({
-          where: { id: patientCase.id },
-          data: {
-            status: "IN_TREATMENT",
-            treatment_duration: treatmentDuration,
-            last_eval_time: treatmentStartTime,
-          },
-        });
-
-        // Create log entry for automatic treatment start
-        const patientData = await prisma.patient.findUnique({
-          where: { id: updatedCase.patient_id }
-        });
-        
-        // Current wait time = time from arrival to now (this gets FROZEN when entering treatment)
-        const currentWaitTime = Math.floor(
-          (treatmentStartTime.getTime() - updatedCase.arrival_time.getTime()) / 60000
-        );
-        const totalTimeInSystem = currentWaitTime;
-        
-        let maxWaitTime = disease?.max_wait_time ?? updatedCase.max_wait_time ?? null;
-        if (typeof maxWaitTime === "string") maxWaitTime = parseFloat(maxWaitTime);
-        if (isNaN(maxWaitTime)) maxWaitTime = null;
-        
-  const escalation = maxWaitTime !== null ? currentWaitTime > maxWaitTime : false;
-        
-        const vitalFields = extractVitalsForLogging(updatedCase.vitals || {});
-        
-        await createCaseLog({
-          patientId: updatedCase.patient_id,
-          caseId: updatedCase.id,
-          zone: updatedCase.zone,
-          diseaseCode: updatedCase.disease_code,
-          priority: updatedCase.priority,
-          age: updatedCase.age,
-          sex: patientData.gender,
-          SI: updatedCase.si,
-          NEWS2: updatedCase.news2,
-          ...vitalFields,
-          resource_score: updatedCase.resource_score,
-          max_wait_time: maxWaitTime,
-          current_wait_time: currentWaitTime, // Frozen wait time
-          total_time_in_system: totalTimeInSystem,
-          escalation,
-          treatment_time: 0, // Treatment just started, so treatment time is 0
-          status: "IN_TREATMENT",
-        });
-
-        console.log(`Case ${patientCase.id} sent to treatment in ${zone} zone (logged)`);
-      }
-    }
-
-    return { success: true, message: "Treatment slots filled successfully" };
+    return { success: true, message: "Treatment slots filled successfully", details: results };
   } catch (error) {
     console.error("Error filling treatment slots:", error);
-
     return { success: false, message: error.message };
   }
 };
@@ -724,19 +896,33 @@ export const recalculateAllPriorities = async () => {
 };
 
 const refreshData = async () => {
-  autoDischargeCompletedTreatments();
-  recalculateAllPriorities();
-  fillTreatmentSlots();
+  console.log("Starting scheduled refresh cycle...");
+  
+  // Step 1: Auto-discharge completed treatments (frees up treatment slots)
+  await autoDischargeCompletedTreatments();
+  
+  // Step 2: Recalculate priorities for all waiting patients (updates queue order)
+  await recalculateAllPriorities();
+  
+  // Step 3: Fill available treatment slots with highest priority patients (parallel zone processing)
+  console.log("Filling available treatment slots after priority recalculation...");
+  await fillTreatmentSlots();
+  
+  console.log("Scheduled refresh cycle completed.");
 };
 
 export const startPriorityScheduler = () => {
   const minutes = 1;
-  cron.schedule(`*/${minutes} * * * *`, () => {
-    console.log("Running scheduled priority recalculation...");
-    refreshData();
+  cron.schedule(`*/${minutes} * * * *`, async () => {
+    console.log("Running scheduled refresh: auto-discharge → priority recalculation → fill treatment slots...");
+    try {
+      await refreshData();
+    } catch (error) {
+      console.error("Error in scheduled refresh cycle:", error);
+    }
   });
 
-  console.log(`Priority & auto-discharge scheduler started - will run every ${minutes} minutes`);
+  console.log(`Priority scheduler started - will run every ${minutes} minutes (auto-discharge → priority recalc → fill slots)`);
 };
 
 export const triggerFillTreatmentSlots = async (req, res) => {
@@ -781,6 +967,7 @@ export const autoDischargeCompletedTreatments = async () => {
             status: "DISCHARGED",
             time_served: currentTime,
             last_eval_time: currentTime,
+            bed_number: null, // Free up the bed
           },
         });
 

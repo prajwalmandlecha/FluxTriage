@@ -64,6 +64,7 @@ model PatientCase {
   priority           Float       // Calculated priority score for queue ordering
   treatment_duration Int?        // Estimated treatment time in minutes
   max_wait_time      Int?        // Maximum acceptable wait before treatment (minutes)
+  bed_number         String?     // Assigned bed number when in treatment (e.g., "RED-01")
   status             CaseStatus  @default(WAITING)
   arrival_time       DateTime    // When patient first registered in ED
   last_eval_time     DateTime    // Last time priority was recalculated

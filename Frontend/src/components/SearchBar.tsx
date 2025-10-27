@@ -78,6 +78,15 @@ export function SearchBar({ patients, onResultSelect }: SearchBarProps) {
           }`}>
             {patient.priority}
           </Badge>
+          <Badge className={`text-xs ${
+            patient.status === 'WAITING' ? 'bg-amber-100 text-amber-800' : 
+            patient.status === 'IN_TREATMENT' ? 'bg-green-100 text-green-800' : 
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {patient.status === 'WAITING' ? 'Waiting' : 
+             patient.status === 'IN_TREATMENT' ? 'In Treatment' : 
+             patient.status}
+          </Badge>
         </div>
         <Badge variant="outline" className="text-xs">{patient.id}</Badge>
       </div>
@@ -85,8 +94,15 @@ export function SearchBar({ patients, onResultSelect }: SearchBarProps) {
         <div>{patient.age}y, {patient.gender}</div>
         <div className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {patient.waitingTime}m wait
+          {patient.status === 'WAITING' ? `${patient.waitingTime}m wait` : 
+           patient.status === 'IN_TREATMENT' ? `${patient.treatmentTime}m treatment` : 
+           '-'}
         </div>
+        {patient.status === 'IN_TREATMENT' && patient.bedNumber && (
+          <div className="col-span-2 flex items-center gap-1 text-xs text-blue-600 font-medium">
+            <span>🛏️ Bed: {patient.bedNumber}</span>
+          </div>
+        )}
         <div className="col-span-2 truncate">{patient.symptoms}</div>
         <div className="col-span-2 truncate text-xs">{patient.diagnosis}</div>
         <div className="flex items-center gap-1 text-xs">

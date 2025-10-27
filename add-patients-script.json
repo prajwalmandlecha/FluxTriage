@@ -1,0 +1,949 @@
+{
+  "info": {
+    "name": "FluxTriage - Add Patients to All Zones",
+    "description": "Complete collection to add 40+ patients across RED, ORANGE, YELLOW, and GREEN triage zones",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "RED Zone Patients",
+      "item": [
+        {
+          "name": "Add RED Patient 1 - Cardiac Arrest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Robert\",\n  \"lastName\": \"Mitchell\",\n  \"dateOfBirth\": \"1958-03-15\",\n  \"age\": 67,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000001\",\n  \"vitals\": {\n    \"respiratory_rate\": 28,\n    \"oxygen_saturation\": 87,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 39.5,\n    \"systolic_bp\": 85,\n    \"heart_rate\": 140,\n    \"consciousness_level\": \"UNRESPONSIVE\"\n  },\n  \"symptoms\": \"Patient found unresponsive, no pulse detected, CPR in progress\",\n  \"diagnosis\": \"Cardiac Arrest\",\n  \"diseaseCode\": \"I46.9\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 5.0\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 2 - STEMI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Margaret\",\n  \"lastName\": \"Davis\",\n  \"dateOfBirth\": \"1965-08-22\",\n  \"age\": 60,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000002\",\n  \"vitals\": {\n    \"respiratory_rate\": 26,\n    \"oxygen_saturation\": 89,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 37.8,\n    \"systolic_bp\": 88,\n    \"heart_rate\": 135,\n    \"consciousness_level\": \"VOICE\"\n  },\n  \"symptoms\": \"Severe crushing chest pain radiating to left arm, diaphoresis, nausea\",\n  \"diagnosis\": \"ST-Elevation Myocardial Infarction\",\n  \"diseaseCode\": \"I21.0\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.9\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 3 - Stroke",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"James\",\n  \"lastName\": \"Thompson\",\n  \"dateOfBirth\": \"1952-11-30\",\n  \"age\": 72,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000003\",\n  \"vitals\": {\n    \"respiratory_rate\": 27,\n    \"oxygen_saturation\": 88,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 38.2,\n    \"systolic_bp\": 225,\n    \"heart_rate\": 138,\n    \"consciousness_level\": \"PAIN\"\n  },\n  \"symptoms\": \"Sudden onset right-sided weakness, facial droop, slurred speech, confusion\",\n  \"diagnosis\": \"Cerebral Infarction\",\n  \"diseaseCode\": \"I63.9\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.8\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 4 - Respiratory Failure",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Linda\",\n  \"lastName\": \"Martinez\",\n  \"dateOfBirth\": \"1970-05-18\",\n  \"age\": 55,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000004\",\n  \"vitals\": {\n    \"respiratory_rate\": 30,\n    \"oxygen_saturation\": 85,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 39.8,\n    \"systolic_bp\": 82,\n    \"heart_rate\": 142,\n    \"consciousness_level\": \"VOICE\"\n  },\n  \"symptoms\": \"Severe respiratory distress, gasping for air, cyanosis, altered mental status\",\n  \"diagnosis\": \"Acute Respiratory Failure\",\n  \"diseaseCode\": \"J96.00\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.7\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 5 - Sepsis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"William\",\n  \"lastName\": \"Anderson\",\n  \"dateOfBirth\": \"1948-09-12\",\n  \"age\": 77,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000005\",\n  \"vitals\": {\n    \"respiratory_rate\": 29,\n    \"oxygen_saturation\": 86,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 40.0,\n    \"systolic_bp\": 78,\n    \"heart_rate\": 145,\n    \"consciousness_level\": \"PAIN\"\n  },\n  \"symptoms\": \"High fever, confusion, rapid breathing, low blood pressure, suspected infection\",\n  \"diagnosis\": \"Sepsis\",\n  \"diseaseCode\": \"A41.9\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.9\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 6 - Anaphylactic Shock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Sarah\",\n  \"lastName\": \"Wilson\",\n  \"dateOfBirth\": \"1985-02-28\",\n  \"age\": 40,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000006\",\n  \"vitals\": {\n    \"respiratory_rate\": 28,\n    \"oxygen_saturation\": 87,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 37.5,\n    \"systolic_bp\": 80,\n    \"heart_rate\": 140,\n    \"consciousness_level\": \"VOICE\"\n  },\n  \"symptoms\": \"Severe allergic reaction after bee sting, difficulty breathing, throat swelling, urticaria\",\n  \"diagnosis\": \"Anaphylactic Shock\",\n  \"diseaseCode\": \"T78.2XXA\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.6\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 7 - Traumatic Shock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Michael\",\n  \"lastName\": \"Garcia\",\n  \"dateOfBirth\": \"1992-07-14\",\n  \"age\": 33,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000007\",\n  \"vitals\": {\n    \"respiratory_rate\": 26,\n    \"oxygen_saturation\": 88,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 36.2,\n    \"systolic_bp\": 85,\n    \"heart_rate\": 138,\n    \"consciousness_level\": \"PAIN\"\n  },\n  \"symptoms\": \"Motor vehicle accident, multiple trauma, internal bleeding suspected, hypotensive\",\n  \"diagnosis\": \"Traumatic Shock\",\n  \"diseaseCode\": \"T79.4XXA\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.8\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 8 - Status Epilepticus",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jennifer\",\n  \"lastName\": \"Brown\",\n  \"dateOfBirth\": \"1978-12-05\",\n  \"age\": 46,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000008\",\n  \"vitals\": {\n    \"respiratory_rate\": 27,\n    \"oxygen_saturation\": 86,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 39.2,\n    \"systolic_bp\": 90,\n    \"heart_rate\": 136,\n    \"consciousness_level\": \"UNRESPONSIVE\"\n  },\n  \"symptoms\": \"Continuous seizure activity for over 30 minutes, unresponsive between seizures\",\n  \"diagnosis\": \"Status Epilepticus\",\n  \"diseaseCode\": \"G40.911\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.7\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 9 - Intracerebral Hemorrhage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"David\",\n  \"lastName\": \"Rodriguez\",\n  \"dateOfBirth\": \"1960-04-20\",\n  \"age\": 65,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000009\",\n  \"vitals\": {\n    \"respiratory_rate\": 25,\n    \"oxygen_saturation\": 89,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 38.5,\n    \"systolic_bp\": 230,\n    \"heart_rate\": 132,\n    \"consciousness_level\": \"PAIN\"\n  },\n  \"symptoms\": \"Sudden severe headache, vomiting, decreased consciousness, seizure\",\n  \"diagnosis\": \"Intracerebral Hemorrhage\",\n  \"diseaseCode\": \"I61.9\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.9\n}"
+            }
+          }
+        },
+        {
+          "name": "Add RED Patient 10 - Acute MI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Patricia\",\n  \"lastName\": \"Miller\",\n  \"dateOfBirth\": \"1963-06-08\",\n  \"age\": 62,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000010\",\n  \"vitals\": {\n    \"respiratory_rate\": 28,\n    \"oxygen_saturation\": 88,\n    \"supplemental_oxygen\": true,\n    \"temperature\": 37.9,\n    \"systolic_bp\": 83,\n    \"heart_rate\": 141,\n    \"consciousness_level\": \"VOICE\"\n  },\n  \"symptoms\": \"Severe chest pain, shortness of breath, cold sweats, irregular heartbeat\",\n  \"diagnosis\": \"Acute Myocardial Infarction\",\n  \"diseaseCode\": \"I21.9\",\n  \"severityIndex\": 4,\n  \"resourceScore\": 4.8\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ORANGE Zone Patients",
+      "item": [
+        {
+          "name": "Add ORANGE Patient 1 - Pneumonia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Christopher\",\n  \"lastName\": \"Taylor\",\n  \"dateOfBirth\": \"1968-10-11\",\n  \"age\": 57,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000011\",\n  \"vitals\": {\n    \"respiratory_rate\": 23,\n    \"oxygen_saturation\": 91,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 38.8,\n    \"systolic_bp\": 105,\n    \"heart_rate\": 118,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Productive cough, fever, chest pain with breathing, shortness of breath\",\n  \"diagnosis\": \"Pneumonia\",\n  \"diseaseCode\": \"J18.9\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.8\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 2 - Acute Appendicitis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Amanda\",\n  \"lastName\": \"White\",\n  \"dateOfBirth\": \"1995-03-25\",\n  \"age\": 30,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000012\",\n  \"vitals\": {\n    \"respiratory_rate\": 22,\n    \"oxygen_saturation\": 92,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 38.5,\n    \"systolic_bp\": 108,\n    \"heart_rate\": 115,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Severe right lower quadrant abdominal pain, nausea, vomiting, fever\",\n  \"diagnosis\": \"Acute Appendicitis\",\n  \"diseaseCode\": \"K35.80\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.6\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 3 - COPD Exacerbation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Richard\",\n  \"lastName\": \"Harris\",\n  \"dateOfBirth\": \"1955-08-17\",\n  \"age\": 70,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000013\",\n  \"vitals\": {\n    \"respiratory_rate\": 24,\n    \"oxygen_saturation\": 90,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 38.2,\n    \"systolic_bp\": 110,\n    \"heart_rate\": 122,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Increased shortness of breath, wheezing, productive cough with green sputum\",\n  \"diagnosis\": \"COPD Exacerbation\",\n  \"diseaseCode\": \"J44.1\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.7\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 4 - Acute Asthma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Elizabeth\",\n  \"lastName\": \"Clark\",\n  \"dateOfBirth\": \"1988-11-30\",\n  \"age\": 36,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000014\",\n  \"vitals\": {\n    \"respiratory_rate\": 21,\n    \"oxygen_saturation\": 93,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.5,\n    \"systolic_bp\": 102,\n    \"heart_rate\": 120,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Severe wheezing, chest tightness, difficulty breathing, unable to complete sentences\",\n  \"diagnosis\": \"Acute Asthma Exacerbation\",\n  \"diseaseCode\": \"J45.901\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.5\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 5 - GI Bleeding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Thomas\",\n  \"lastName\": \"Lewis\",\n  \"dateOfBirth\": \"1972-01-22\",\n  \"age\": 53,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000015\",\n  \"vitals\": {\n    \"respiratory_rate\": 22,\n    \"oxygen_saturation\": 91,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.2,\n    \"systolic_bp\": 95,\n    \"heart_rate\": 125,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Hematemesis, black tarry stools, dizziness, weakness, pale appearance\",\n  \"diagnosis\": \"Gastrointestinal Bleeding\",\n  \"diseaseCode\": \"K92.2\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.9\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 6 - Acute Kidney Injury",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Nancy\",\n  \"lastName\": \"Walker\",\n  \"dateOfBirth\": \"1966-07-09\",\n  \"age\": 59,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000016\",\n  \"vitals\": {\n    \"respiratory_rate\": 23,\n    \"oxygen_saturation\": 92,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 38.6,\n    \"systolic_bp\": 188,\n    \"heart_rate\": 116,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Decreased urine output, swelling in legs, confusion, nausea, fatigue\",\n  \"diagnosis\": \"Acute Kidney Injury\",\n  \"diseaseCode\": \"N17.9\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.7\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 7 - Renal Colic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kevin\",\n  \"lastName\": \"Hall\",\n  \"dateOfBirth\": \"1980-05-14\",\n  \"age\": 45,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000017\",\n  \"vitals\": {\n    \"respiratory_rate\": 21,\n    \"oxygen_saturation\": 93,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 38.1,\n    \"systolic_bp\": 195,\n    \"heart_rate\": 118,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Severe colicky flank pain radiating to groin, nausea, vomiting, hematuria\",\n  \"diagnosis\": \"Renal Colic - Kidney Stone\",\n  \"diseaseCode\": \"N20.0\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.4\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 8 - Diabetic Ketoacidosis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Susan\",\n  \"lastName\": \"Young\",\n  \"dateOfBirth\": \"1990-09-03\",\n  \"age\": 35,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000018\",\n  \"vitals\": {\n    \"respiratory_rate\": 24,\n    \"oxygen_saturation\": 91,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.8,\n    \"systolic_bp\": 100,\n    \"heart_rate\": 128,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Excessive thirst, frequent urination, fruity breath odor, weakness, confusion\",\n  \"diagnosis\": \"Diabetic Ketoacidosis\",\n  \"diseaseCode\": \"E10.10\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.8\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 9 - Traumatic Brain Injury",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Daniel\",\n  \"lastName\": \"Allen\",\n  \"dateOfBirth\": \"1998-12-19\",\n  \"age\": 26,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000019\",\n  \"vitals\": {\n    \"respiratory_rate\": 22,\n    \"oxygen_saturation\": 92,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.3,\n    \"systolic_bp\": 182,\n    \"heart_rate\": 114,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Head trauma from fall, confusion, headache, brief loss of consciousness, vomiting\",\n  \"diagnosis\": \"Traumatic Brain Injury\",\n  \"diseaseCode\": \"S06.9XXA\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.6\n}"
+            }
+          }
+        },
+        {
+          "name": "Add ORANGE Patient 10 - TIA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Barbara\",\n  \"lastName\": \"King\",\n  \"dateOfBirth\": \"1961-04-07\",\n  \"age\": 64,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000020\",\n  \"vitals\": {\n    \"respiratory_rate\": 21,\n    \"oxygen_saturation\": 93,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.6,\n    \"systolic_bp\": 190,\n    \"heart_rate\": 120,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Temporary weakness on left side, brief speech difficulty, vision changes - now resolved\",\n  \"diagnosis\": \"Transient Ischemic Attack\",\n  \"diseaseCode\": \"G45.9\",\n  \"severityIndex\": 3,\n  \"resourceScore\": 3.5\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "YELLOW Zone Patients",
+      "item": [
+        {
+          "name": "Add YELLOW Patient 1 - Ankle Sprain",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Matthew\",\n  \"lastName\": \"Wright\",\n  \"dateOfBirth\": \"1993-06-21\",\n  \"age\": 32,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000021\",\n  \"vitals\": {\n    \"respiratory_rate\": 18,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.0,\n    \"systolic_bp\": 128,\n    \"heart_rate\": 95,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Twisted ankle during basketball, swelling, moderate pain, able to bear weight\",\n  \"diagnosis\": \"Ankle Sprain\",\n  \"diseaseCode\": \"S93.40XA\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.5\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 2 - Laceration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Emily\",\n  \"lastName\": \"Lopez\",\n  \"dateOfBirth\": \"1987-02-14\",\n  \"age\": 38,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000022\",\n  \"vitals\": {\n    \"respiratory_rate\": 16,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.8,\n    \"systolic_bp\": 122,\n    \"heart_rate\": 88,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Cut on hand from kitchen knife, bleeding controlled, needs sutures\",\n  \"diagnosis\": \"Hand Laceration\",\n  \"diseaseCode\": \"S61.401A\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.2\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 3 - Forearm Fracture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Andrew\",\n  \"lastName\": \"Hill\",\n  \"dateOfBirth\": \"2005-08-30\",\n  \"age\": 20,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000023\",\n  \"vitals\": {\n    \"respiratory_rate\": 17,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.9,\n    \"systolic_bp\": 118,\n    \"heart_rate\": 92,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Fell off skateboard, deformed forearm, moderate pain, swelling\",\n  \"diagnosis\": \"Forearm Fracture\",\n  \"diseaseCode\": \"S52.501A\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.7\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 4 - Moderate Headache",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jessica\",\n  \"lastName\": \"Scott\",\n  \"dateOfBirth\": \"1976-11-12\",\n  \"age\": 48,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000024\",\n  \"vitals\": {\n    \"respiratory_rate\": 18,\n    \"oxygen_saturation\": 97,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.2,\n    \"systolic_bp\": 135,\n    \"heart_rate\": 98,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Persistent throbbing headache for 6 hours, photophobia, nausea\",\n  \"diagnosis\": \"Moderate Headache\",\n  \"diseaseCode\": \"R51\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.3\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 5 - UTI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Rebecca\",\n  \"lastName\": \"Green\",\n  \"dateOfBirth\": \"1991-03-28\",\n  \"age\": 34,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000025\",\n  \"vitals\": {\n    \"respiratory_rate\": 16,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.8,\n    \"systolic_bp\": 125,\n    \"heart_rate\": 94,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Burning with urination, frequent urge to urinate, lower abdominal discomfort\",\n  \"diagnosis\": \"Urinary Tract Infection\",\n  \"diseaseCode\": \"N39.0\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.1\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 6 - Pyelonephritis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Joseph\",\n  \"lastName\": \"Adams\",\n  \"dateOfBirth\": \"1982-07-05\",\n  \"age\": 43,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000026\",\n  \"vitals\": {\n    \"respiratory_rate\": 19,\n    \"oxygen_saturation\": 96,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 38.0,\n    \"systolic_bp\": 132,\n    \"heart_rate\": 102,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Flank pain, fever, chills, painful urination, nausea\",\n  \"diagnosis\": \"Pyelonephritis\",\n  \"diseaseCode\": \"N10\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.8\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 7 - GERD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Michelle\",\n  \"lastName\": \"Baker\",\n  \"dateOfBirth\": \"1974-09-16\",\n  \"age\": 51,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000027\",\n  \"vitals\": {\n    \"respiratory_rate\": 17,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.7,\n    \"systolic_bp\": 130,\n    \"heart_rate\": 88,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Burning chest pain after eating, regurgitation, difficulty swallowing\",\n  \"diagnosis\": \"Gastroesophageal Reflux Disease\",\n  \"diseaseCode\": \"K21.9\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.0\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 8 - Acute Back Pain",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Brian\",\n  \"lastName\": \"Nelson\",\n  \"dateOfBirth\": \"1979-12-03\",\n  \"age\": 45,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000028\",\n  \"vitals\": {\n    \"respiratory_rate\": 18,\n    \"oxygen_saturation\": 97,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.9,\n    \"systolic_bp\": 126,\n    \"heart_rate\": 90,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Severe lower back pain after lifting heavy object, muscle spasms, limited mobility\",\n  \"diagnosis\": \"Acute Back Pain\",\n  \"diseaseCode\": \"M79.3\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.4\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 9 - Upper Respiratory Infection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Stephanie\",\n  \"lastName\": \"Carter\",\n  \"dateOfBirth\": \"1996-05-20\",\n  \"age\": 29,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000029\",\n  \"vitals\": {\n    \"respiratory_rate\": 19,\n    \"oxygen_saturation\": 96,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.6,\n    \"systolic_bp\": 115,\n    \"heart_rate\": 96,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Sore throat, nasal congestion, mild cough, body aches for 3 days\",\n  \"diagnosis\": \"Upper Respiratory Infection\",\n  \"diseaseCode\": \"J06.9\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.2\n}"
+            }
+          }
+        },
+        {
+          "name": "Add YELLOW Patient 10 - Cellulitis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Raymond\",\n  \"lastName\": \"Mitchell\",\n  \"dateOfBirth\": \"1969-01-11\",\n  \"age\": 56,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000030\",\n  \"vitals\": {\n    \"respiratory_rate\": 18,\n    \"oxygen_saturation\": 97,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.9,\n    \"systolic_bp\": 138,\n    \"heart_rate\": 100,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Red, swollen, warm area on lower leg, tender to touch, mild fever\",\n  \"diagnosis\": \"Cellulitis\",\n  \"diseaseCode\": \"L03.90\",\n  \"severityIndex\": 2,\n  \"resourceScore\": 2.6\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "GREEN Zone Patients",
+      "item": [
+        {
+          "name": "Add GREEN Patient 1 - Prescription Refill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Dorothy\",\n  \"lastName\": \"Perez\",\n  \"dateOfBirth\": \"1956-10-25\",\n  \"age\": 68,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000031\",\n  \"vitals\": {\n    \"respiratory_rate\": 14,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.5,\n    \"systolic_bp\": 128,\n    \"heart_rate\": 72,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Ran out of blood pressure medication, no acute symptoms\",\n  \"diagnosis\": \"Prescription Refill Request\",\n  \"diseaseCode\": \"Z79.4\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.2\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 2 - Minor Viral Infection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Steven\",\n  \"lastName\": \"Roberts\",\n  \"dateOfBirth\": \"2000-04-17\",\n  \"age\": 25,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000032\",\n  \"vitals\": {\n    \"respiratory_rate\": 15,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.2,\n    \"systolic_bp\": 120,\n    \"heart_rate\": 68,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Mild runny nose, slight fatigue, no fever\",\n  \"diagnosis\": \"Minor Viral Infection\",\n  \"diseaseCode\": \"B34.9\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.1\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 3 - Non-productive Cough",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Karen\",\n  \"lastName\": \"Turner\",\n  \"dateOfBirth\": \"1983-08-09\",\n  \"age\": 42,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000033\",\n  \"vitals\": {\n    \"respiratory_rate\": 16,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.8,\n    \"systolic_bp\": 118,\n    \"heart_rate\": 70,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Dry cough for 2 days, no other symptoms, no difficulty breathing\",\n  \"diagnosis\": \"Non-productive Cough\",\n  \"diseaseCode\": \"R05\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.3\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 4 - Nausea",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jason\",\n  \"lastName\": \"Phillips\",\n  \"dateOfBirth\": \"1989-11-22\",\n  \"age\": 35,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000034\",\n  \"vitals\": {\n    \"respiratory_rate\": 14,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.6,\n    \"systolic_bp\": 122,\n    \"heart_rate\": 75,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Mild nausea after eating, no vomiting, mild stomach discomfort\",\n  \"diagnosis\": \"Nausea\",\n  \"diseaseCode\": \"R11.0\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.4\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 5 - Mild Dizziness",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Laura\",\n  \"lastName\": \"Campbell\",\n  \"dateOfBirth\": \"1971-06-14\",\n  \"age\": 54,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000035\",\n  \"vitals\": {\n    \"respiratory_rate\": 15,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.7,\n    \"systolic_bp\": 125,\n    \"heart_rate\": 78,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Brief episodes of lightheadedness when standing, no falls\",\n  \"diagnosis\": \"Mild Dizziness\",\n  \"diseaseCode\": \"R42\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.5\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 6 - Dermatitis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Mark\",\n  \"lastName\": \"Parker\",\n  \"dateOfBirth\": \"1994-03-07\",\n  \"age\": 31,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000036\",\n  \"vitals\": {\n    \"respiratory_rate\": 14,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.5,\n    \"systolic_bp\": 118,\n    \"heart_rate\": 65,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Itchy rash on arms, no spreading, mild discomfort\",\n  \"diagnosis\": \"Dermatitis\",\n  \"diseaseCode\": \"L30.9\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.2\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 7 - General Medical Exam",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Betty\",\n  \"lastName\": \"Evans\",\n  \"dateOfBirth\": \"1942-09-18\",\n  \"age\": 83,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000037\",\n  \"vitals\": {\n    \"respiratory_rate\": 16,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.6,\n    \"systolic_bp\": 135,\n    \"heart_rate\": 72,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Routine checkup, no acute complaints\",\n  \"diagnosis\": \"General Medical Examination\",\n  \"diseaseCode\": \"Z00.00\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.1\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 8 - Fatigue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Timothy\",\n  \"lastName\": \"Edwards\",\n  \"dateOfBirth\": \"1986-12-29\",\n  \"age\": 38,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000038\",\n  \"vitals\": {\n    \"respiratory_rate\": 15,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.8,\n    \"systolic_bp\": 120,\n    \"heart_rate\": 68,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Feeling tired for past week, no other symptoms, wants evaluation\",\n  \"diagnosis\": \"Fatigue\",\n  \"diseaseCode\": \"R53.83\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.3\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 9 - Minor Cold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Sharon\",\n  \"lastName\": \"Collins\",\n  \"dateOfBirth\": \"1977-05-31\",\n  \"age\": 48,\n  \"gender\": \"Female\",\n  \"phone\": \"+1000000039\",\n  \"vitals\": {\n    \"respiratory_rate\": 14,\n    \"oxygen_saturation\": 99,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 37.0,\n    \"systolic_bp\": 122,\n    \"heart_rate\": 70,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Mild sneezing, clear nasal discharge, feeling fine otherwise\",\n  \"diagnosis\": \"Minor Viral Infection\",\n  \"diseaseCode\": \"B34.9\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.2\n}"
+            }
+          }
+        },
+        {
+          "name": "Add GREEN Patient 10 - Skin Rash",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/patients/add-to-ed",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "patients", "add-to-ed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ronald\",\n  \"lastName\": \"Stewart\",\n  \"dateOfBirth\": \"2002-02-10\",\n  \"age\": 23,\n  \"gender\": \"Male\",\n  \"phone\": \"+1000000040\",\n  \"vitals\": {\n    \"respiratory_rate\": 15,\n    \"oxygen_saturation\": 98,\n    \"supplemental_oxygen\": false,\n    \"temperature\": 36.7,\n    \"systolic_bp\": 115,\n    \"heart_rate\": 66,\n    \"consciousness_level\": \"ALERT\"\n  },\n  \"symptoms\": \"Small itchy rash appeared yesterday, no pain, no spreading\",\n  \"diagnosis\": \"Dermatitis\",\n  \"diseaseCode\": \"L30.9\",\n  \"severityIndex\": 1,\n  \"resourceScore\": 1.4\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

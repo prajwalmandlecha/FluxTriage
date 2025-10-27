@@ -28,6 +28,7 @@ export interface Patient {
   waitingTime: number; // in minutes
   treatmentTime: number; // in minutes, only for IN_TREATMENT
   status: string; // WAITING, IN_TREATMENT, DISCHARGED
+  bedNumber?: string; // Bed number when in treatment (e.g., "RED-01", "ORANGE-03")
   arrivalTime: Date;
   contactNumber: string;
 }
