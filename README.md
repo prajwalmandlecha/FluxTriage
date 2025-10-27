@@ -12,23 +12,22 @@ A sophisticated, intelligent Emergency Department (ED) triage management system 
 
 ## 🏥 Table of Contents
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [System Architecture](#system-architecture)
-- [Technology Stack](#technology-stack)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Core Concepts](#core-concepts)
-- [API Documentation](#api-documentation)
-- [Database Schema](#database-schema)
-- [Priority Calculation Algorithm](#priority-calculation-algorithm)
-- [Logging & ML Readiness](#logging--ml-readiness)
-- [Disease Database](#disease-database)
-- [Screenshots](#screenshots)
-- [Development Guide](#development-guide)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Core Concepts](#-core-concepts)
+- [System Architecture](#-system-architecture)
+- [Technology Stack](#-technology-stack)
+- [Getting Started](#-getting-started)
+- [Project Structure](#-project-structure)
+- [API Documentation](#-api-documentation)
+- [Database Schema](#-database-schema)
+- [Priority Calculation Algorithm](#-priority-calculation-algorithm)
+- [Logging & ML Readiness](#-logging--ml-readiness)
+- [Disease Database](#-disease-database)
+- [Screenshots](#-screenshots)
+- [Development Guide](#-development-guide)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
 
 ---
 
@@ -97,60 +96,219 @@ The system automatically assigns patients to color-coded triage zones (RED, ORAN
 
 ---
 
+
+## 💡 Core Concepts
+
+### 1. Triage Zones
+
+FluxTriage uses a 4-level color-coded triage system based on the **Emergency Severity Index (ESI)**:
+
+| Zone   | Name         | NEWS2 Range | SI Level | Max Wait Time | Bed Capacity |
+|--------|--------------|-------------|----------|---------------|--------------|
+| **RED**    | Critical     | 7-20        | 4        | 0-10 min      | 5 beds       |
+| **ORANGE** | Urgent       | 5-6         | 3        | 5-90 min      | 8 beds       |
+| **YELLOW** | Semi-Urgent  | 2-4         | 2        | 90-120 min    | 10 beds      |
+| **GREEN**  | Non-Urgent   | 0-1         | 1        | 180-240 min   | 15 beds      |
+
+**Zone Assignment Logic**:
+- Patient's zone is determined by the **higher priority** of NEWS2 zone or SI zone
+- Example: If NEWS2 = 3 (YELLOW) but SI = 4 (RED), final zone = **RED**
+- Ensures patients are never under-triaged
+
+### 2. NEWS2 Score (National Early Warning Score 2)
+
+NEWS2 is an NHS-approved physiological scoring system (0-20) based on 7 vital signs parameters:
+
+| Parameter              | Range               | Points |
+|------------------------|---------------------|--------|
+| Respiratory Rate       | ≤8 or ≥25           | 3      |
+|                        | 9-11 or 21-24       | 1-2    |
+|                        | 12-20               | 0      |
+| Oxygen Saturation      | <85%                | 3      |
+|                        | 85-93%              | 1-2    |
+|                        | ≥94%                | 0      |
+| Supplemental Oxygen    | Yes                 | 2      |
+|                        | No                  | 0      |
+| Systolic BP            | ≤90 or ≥220 mmHg    | 3      |
+|                        | 91-110 or 181-219   | 1-2    |
+|                        | 111-180             | 0      |
+| Heart Rate (Pulse)     | ≤40 or ≥131 bpm     | 3      |
+|                        | 41-50 or 111-130    | 1-2    |
+|                        | 51-90               | 0      |
+| Temperature            | ≤35.0°C or ≥39.1°C  | 2-3    |
+|                        | 35.1-36.0 or 38.1-39| 1      |
+|                        | 36.1-38.0           | 0      |
+| Consciousness (ACVPU)  | C, V, P, U          | 3      |
+|                        | A (Alert)           | 0      |
+
+**Clinical Significance**:
+- **0-1**: Low risk (GREEN)
+- **2-4**: Medium risk (YELLOW)
+- **5-6**: High risk (ORANGE)
+- **7+**: Critical risk (RED) - NHS threshold for urgent medical review
+
+### 3. Severity Index (SI)
+
+Disease-specific severity classification (1-4 scale):
+
+- **SI 4 (RED)**: Life-threatening (e.g., STEMI, Cardiac Arrest, Stroke)
+- **SI 3 (ORANGE)**: Severe/High-risk (e.g., Sepsis, Acute Appendicitis)
+- **SI 2 (YELLOW)**: Moderate (e.g., Simple Fracture, UTI)
+- **SI 1 (GREEN)**: Minor (e.g., Minor Sprain, Prescription Refill)
+
+### 4. Priority Score Algorithm
+
+Each zone has **optimized weights** for different factors:
+
+```javascript
+Priority = (wNEWS2 × NEWS2) + (wSI × SI) + (wT × WaitTime) + (wR × ResourceScore) + (wA × AgeFactor)
+```
+
+**Zone-Specific Weights** (optimized through patient flow analysis):
+
+| Zone   | wNEWS2 | wSI    | wT     | wR   | wA     |
+|--------|--------|--------|--------|------|--------|
+| RED    | 0.01   | 0.0947 | 0.8321 | 0.01 | 0.2222 |
+| ORANGE | 0.01   | 0.4324 | 0.8815 | 0.01 | 0.4611 |
+| YELLOW | 0.01   | 0.01   | 0.7226 | 0.01 | 0.01   |
+| GREEN  | 0.0968 | 0.2717 | 1.0    | 0.01 | 0.0133 |
+
+**Key Insights**:
+- **Critical zones (RED/ORANGE)**: Wait time dominates, but age and SI matter
+- **Stable zones (YELLOW/GREEN)**: Wait time is primary factor to prevent neglect
+- **Wait time modifier**: Only counts after 70% of maxWaitTime to avoid premature escalation
+
+**Age Factor**:
+- **High Risk (1)**: Age < 18 or > 50 (vulnerable populations)
+- **Low Risk (0)**: Age 18-50 (standard risk)
+
+### 5. Treatment Capacity Management
+
+**Auto-Fill Mechanism**:
+1. Runs every 2 minutes via cron scheduler
+2. For each zone (RED → ORANGE → YELLOW → GREEN):
+   - Count available beds (capacity - occupied)
+   - Query waiting patients by priority DESC
+   - Assign highest-priority patients to beds
+   - Update case status: `WAITING` → `IN_TREATMENT`
+3. Logs treatment admission event
+
+**Manual Assignment**:
+- Drag-and-drop from waiting queue to specific bed
+- Validates zone matching (can't assign RED patient to GREEN zone)
+- Updates backend immediately
+
+### 6. Time-Series Logging
+
+**CaseLog Model** captures patient state at multiple timepoints:
+
+- **On Arrival**: Initial triage snapshot
+- **Every 2 Minutes**: While status = WAITING (for priority recalculation)
+- **On Treatment Admission**: When moved to treatment queue
+- **On Discharge**: Final state capture
+
+**Logged Fields** (18 fields per log entry):
+- Patient demographics (age, sex)
+- Clinical data (NEWS2, SI, vitals breakdown)
+- Priority metrics (priority score, zone, escalation flag)
+- Temporal data (current_wait_time, total_time_in_system)
+- Status transitions (Waiting → Admitted → Discharged)
+
+**Purpose**: Machine learning analysis of:
+- Triage effectiveness
+- Priority score evolution
+- Wait time patterns
+- Escalation triggers
+- Treatment duration accuracy
+
+
+---
+
+## 🖼️ Screenshots
+
+### Dashboard View
+![Dashboard](Screenshots/Dashboard.png)
+*Real-time KPIs: Total patients, avg wait time, bed occupancy, critical cases*
+
+### Patient Inspector
+![Patient Inspector](Screenshots/Dashboard(Patient-Search).png)*
+*Detailed patient view with vitals, zone assignment, and priority evolution chart*
+
+### Zone View (RED)
+![Zone View](Screenshots/Red-Zone-Dashboard.png)
+*Waiting queue (left) and treatment beds (right)*
+
+### Zone View (ORANGE)
+![Zone View](Screenshots/Orange-Zone-Dashboard.png)
+*Similar layout for ORANGE zone with real-time updates*
+
+### Add Patient Form
+![Add Patient Form](Screenshots/Patient-Form.png)
+*Comprehensive patient registration with vitals input and disease search*
+
+### Disease Dropdown
+![Disease Dropdown](Screenshots/Disease-Form.png)
+*Auto-suggest disease search with severity and treatment info*
+
+---
+
+
+---
+
 ## 🏗️ System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Frontend (React + Vite)                 │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │  Dashboard  │  │  Zone Pages  │  │  Patient Forms   │  │
-│  └─────────────┘  └──────────────┘  └──────────────────┘  │
-│         │                  │                   │            │
-│         └──────────────────┴───────────────────┘            │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+│  │  Dashboard  │  │  Zone Pages  │  │  Patient Forms   │    │
+│  └─────────────┘  └──────────────┘  └──────────────────┘    │
+│         │                 │                   │             │
+│         └─────────────────┴───────────────────┘             │
 │                           │                                 │
 │                   Axios API Client                          │
 └───────────────────────────┼─────────────────────────────────┘
                             │
-                   HTTP REST API (Port 3000)
+                      HTTP REST API
                             │
 ┌───────────────────────────┼─────────────────────────────────┐
 │                    Backend (Node.js + Express)              │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              Controllers Layer                        │  │
-│  │  • TriageController (priority, queues, treatment)    │  │
-│  │  • PatientController (CRUD, search)                  │  │
-│  │  • DiseaseController (catalog management)            │  │
-│  └───────────────────────┬──────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Controllers Layer                       │   │
+│  │  • TriageController (priority, queues, treatment)    │   │
+│  │  • PatientController (CRUD, search)                  │   │
+│  │  • DiseaseController (catalog management)            │   │
+│  └───────────────────────┬──────────────────────────────┘   │
 │                          │                                  │
-│  ┌───────────────────────┴──────────────────────────────┐  │
-│  │               Business Logic Layer                    │  │
-│  │  • NEWS2 Calculator (vitals → severity score)        │  │
-│  │  • Priority Calculator (multi-factor algorithm)      │  │
-│  │  • Zone Assignment (NEWS2 + SI → zone)               │  │
-│  │  • Logging Service (time-series data capture)        │  │
-│  └───────────────────────┬──────────────────────────────┘  │
+│  ┌───────────────────────┴──────────────────────────────┐   │
+│  │               Business Logic Layer                   │   │
+│  │  • NEWS2 Calculator (vitals → severity score)        │   │
+│  │  • Priority Calculator (multi-factor algorithm)      │   │
+│  │  • Zone Assignment (NEWS2 + SI → zone)               │   │
+│  │  • Logging Service (time-series data capture)        │   │
+│  └───────────────────────┬──────────────────────────────┘   │
 │                          │                                  │
-│  ┌───────────────────────┴──────────────────────────────┐  │
-│  │              Prisma ORM Layer                         │  │
-│  │  • Patient, PatientCase, Disease, CaseLog models     │  │
-│  └───────────────────────┬──────────────────────────────┘  │
+│  ┌───────────────────────┴──────────────────────────────┐   │
+│  │              Prisma ORM Layer                        │   │
+│  │  • Patient, PatientCase, Disease, CaseLog models     │   │
+│  └───────────────────────┬──────────────────────────────┘   │
 │                          │                                  │
-│  ┌───────────────────────┴──────────────────────────────┐  │
-│  │              Cron Scheduler                           │  │
-│  │  • Priority Recalculation (every 2 min)              │  │
-│  │  • Treatment Slot Filling (every 2 min)              │  │
-│  └──────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────┴──────────────────────────────┐   │
+│  │              Cron Scheduler                          │   │
+│  │  • Priority Recalculation (every 1 min)              │   │
+│  │  • Treatment Slot Filling (every 1 min)              │   │
+│  └──────────────────────────────────────────────────────┘   │
 └───────────────────────────┼─────────────────────────────────┘
                             │
                    Database Connection
                             │
 ┌───────────────────────────┼─────────────────────────────────┐
 │           PostgreSQL 14 (Docker Container)                  │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Database: triage_db                                 │  │
-│  │  Tables: Patient, PatientCase, Disease, CaseLog     │  │
-│  │  Indexes: Optimized for zone, status, priority      │  │
-│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Database: triage_db                                 │   │
+│  │  Tables: Patient, PatientCase, Disease, CaseLog      │   │
+│  │  Indexes: Optimized for zone, status, priority       │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -278,6 +436,9 @@ You should see the FluxTriage dashboard with the home page displaying zone stati
 
 ---
 
+---
+
+
 ## 📁 Project Structure
 
 ```
@@ -346,133 +507,6 @@ FluxTriage/
     └── DOCKER_POSTGRESQL_SETUP.md      # Docker setup guide
 ```
 
----
-
-## 💡 Core Concepts
-
-### 1. Triage Zones
-
-FluxTriage uses a 4-level color-coded triage system based on the **Emergency Severity Index (ESI)**:
-
-| Zone   | Name         | NEWS2 Range | SI Level | Max Wait Time | Bed Capacity |
-|--------|--------------|-------------|----------|---------------|--------------|
-| **RED**    | Critical     | 7-20        | 4        | 0-10 min      | 5 beds       |
-| **ORANGE** | Urgent       | 5-6         | 3        | 5-90 min      | 8 beds       |
-| **YELLOW** | Semi-Urgent  | 2-4         | 2        | 90-120 min    | 10 beds      |
-| **GREEN**  | Non-Urgent   | 0-1         | 1        | 180-240 min   | 15 beds      |
-
-**Zone Assignment Logic**:
-- Patient's zone is determined by the **higher priority** of NEWS2 zone or SI zone
-- Example: If NEWS2 = 3 (YELLOW) but SI = 4 (RED), final zone = **RED**
-- Ensures patients are never under-triaged
-
-### 2. NEWS2 Score (National Early Warning Score 2)
-
-NEWS2 is an NHS-approved physiological scoring system (0-20) based on 7 vital signs parameters:
-
-| Parameter              | Range                | Points |
-|------------------------|----------------------|--------|
-| Respiratory Rate       | ≤8 or ≥25           | 3      |
-|                        | 9-11 or 21-24       | 1-2    |
-|                        | 12-20               | 0      |
-| Oxygen Saturation      | <85%                | 3      |
-|                        | 85-93%              | 1-2    |
-|                        | ≥94%                | 0      |
-| Supplemental Oxygen    | Yes                 | 2      |
-|                        | No                  | 0      |
-| Systolic BP            | ≤90 or ≥220 mmHg    | 3      |
-|                        | 91-110 or 181-219   | 1-2    |
-|                        | 111-180             | 0      |
-| Heart Rate (Pulse)     | ≤40 or ≥131 bpm     | 3      |
-|                        | 41-50 or 111-130    | 1-2    |
-|                        | 51-90               | 0      |
-| Temperature            | ≤35.0°C or ≥39.1°C  | 2-3    |
-|                        | 35.1-36.0 or 38.1-39| 1      |
-|                        | 36.1-38.0           | 0      |
-| Consciousness (ACVPU)  | C, V, P, U          | 3      |
-|                        | A (Alert)           | 0      |
-
-**Clinical Significance**:
-- **0-1**: Low risk (GREEN)
-- **2-4**: Medium risk (YELLOW)
-- **5-6**: High risk (ORANGE)
-- **7+**: Critical risk (RED) - NHS threshold for urgent medical review
-
-### 3. Severity Index (SI)
-
-Disease-specific severity classification (1-4 scale):
-
-- **SI 4 (RED)**: Life-threatening (e.g., STEMI, Cardiac Arrest, Stroke)
-- **SI 3 (ORANGE)**: Severe/High-risk (e.g., Sepsis, Acute Appendicitis)
-- **SI 2 (YELLOW)**: Moderate (e.g., Simple Fracture, UTI)
-- **SI 1 (GREEN)**: Minor (e.g., Minor Sprain, Prescription Refill)
-
-### 4. Priority Score Algorithm
-
-Each zone has **optimized weights** for different factors:
-
-```javascript
-Priority = (wNEWS2 × NEWS2) + (wSI × SI) + (wT × WaitTime) + (wR × ResourceScore) + (wA × AgeFactor)
-```
-
-**Zone-Specific Weights** (optimized through patient flow analysis):
-
-| Zone   | wNEWS2 | wSI    | wT     | wR   | wA     |
-|--------|--------|--------|--------|------|--------|
-| RED    | 0.01   | 0.0947 | 0.8321 | 0.01 | 0.2222 |
-| ORANGE | 0.01   | 0.4324 | 0.8815 | 0.01 | 0.4611 |
-| YELLOW | 0.01   | 0.01   | 0.7226 | 0.01 | 0.01   |
-| GREEN  | 0.0968 | 0.2717 | 1.0    | 0.01 | 0.0133 |
-
-**Key Insights**:
-- **Critical zones (RED/ORANGE)**: Wait time dominates, but age and SI matter
-- **Stable zones (YELLOW/GREEN)**: Wait time is primary factor to prevent neglect
-- **Wait time modifier**: Only counts after 70% of maxWaitTime to avoid premature escalation
-
-**Age Factor**:
-- **High Risk (1)**: Age < 18 or > 50 (vulnerable populations)
-- **Low Risk (0)**: Age 18-50 (standard risk)
-
-### 5. Treatment Capacity Management
-
-**Auto-Fill Mechanism**:
-1. Runs every 2 minutes via cron scheduler
-2. For each zone (RED → ORANGE → YELLOW → GREEN):
-   - Count available beds (capacity - occupied)
-   - Query waiting patients by priority DESC
-   - Assign highest-priority patients to beds
-   - Update case status: `WAITING` → `IN_TREATMENT`
-3. Logs treatment admission event
-
-**Manual Assignment**:
-- Drag-and-drop from waiting queue to specific bed
-- Validates zone matching (can't assign RED patient to GREEN zone)
-- Updates backend immediately
-
-### 6. Time-Series Logging
-
-**CaseLog Model** captures patient state at multiple timepoints:
-
-- **On Arrival**: Initial triage snapshot
-- **Every 2 Minutes**: While status = WAITING (for priority recalculation)
-- **On Treatment Admission**: When moved to treatment queue
-- **On Discharge**: Final state capture
-
-**Logged Fields** (18 fields per log entry):
-- Patient demographics (age, sex)
-- Clinical data (NEWS2, SI, vitals breakdown)
-- Priority metrics (priority score, zone, escalation flag)
-- Temporal data (current_wait_time, total_time_in_system)
-- Status transitions (Waiting → Admitted → Discharged)
-
-**Purpose**: Machine learning analysis of:
-- Triage effectiveness
-- Priority score evolution
-- Wait time patterns
-- Escalation triggers
-- Treatment duration accuracy
-
----
 
 ## 📡 API Documentation
 
@@ -968,27 +1002,6 @@ npm run seed
 
 **Location**: `prisma/seed.js`
 
----
-
-## 🖼️ Screenshots
-
-### Dashboard View
-![Dashboard](docs/screenshots/dashboard.png)
-*Real-time KPIs: Total patients, avg wait time, bed occupancy, critical cases*
-
-### Zone View (RED)
-![Zone View](docs/screenshots/zone-view.png)
-*Waiting queue (left) and treatment beds (right) with drag-and-drop*
-
-### Add Patient Form
-![Add Patient Form](docs/screenshots/add-patient-form.png)
-*Comprehensive patient registration with vitals input and disease search*
-
-### Patient Inspector
-![Patient Inspector](docs/screenshots/patient-inspector.png)
-*Detailed patient view with NEWS2 breakdown and medical history*
-
----
 
 ## 👨‍💻 Development Guide
 
@@ -1128,84 +1141,3 @@ We welcome contributions! Please follow these guidelines:
 - Add JSDoc comments for new functions
 - Update README if adding new features
 - Test manually before submitting PR
-
----
-
-## 📄 License
-
-This project is licensed under the **ISC License**.
-
----
-
-## 🙏 Acknowledgments
-
-- **NHS NEWS2 System**: Clinical severity scoring framework
-- **WHO ICD-10**: International disease classification codes
-- **ACEP Guidelines**: Treatment time and severity recommendations
-- **Emergency Severity Index (ESI)**: Triage methodology
-- **Prisma Team**: Excellent ORM for database management
-- **Radix UI**: Accessible component primitives
-- **Tailwind CSS**: Utility-first CSS framework
-
----
-
-## 📞 Contact
-
-**Repository**: [https://github.com/prajwalmandlecha/FluxTriage](https://github.com/prajwalmandlecha/FluxTriage)
-
-**Author**: Prajwal Mandlecha
-
-**Email**: [Contact via GitHub](https://github.com/prajwalmandlecha)
-
----
-
-## 🚨 Disclaimer
-
-**Important**: This system is designed for **educational and demonstration purposes only**. Real-world clinical decisions should be based on:
-
-- Current medical practice standards
-- Individual patient assessment by qualified healthcare professionals
-- Local facility protocols and guidelines
-- Clinical judgment and experience
-
-Treatment times, severity classifications, and wait time thresholds are guidelines and may vary based on:
-- Patient complexity and comorbidities
-- Available hospital resources and staffing
-- Local protocols and regulations
-- Clinical presentation and deterioration risk
-
-**Do NOT use this system for actual patient care without proper medical oversight and regulatory approval.**
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1 (Current)
-- ✅ Core triage system with NEWS2 + SI
-- ✅ Multi-zone queue management
-- ✅ Automated priority recalculation
-- ✅ Treatment bed allocation
-- ✅ Time-series logging for ML
-
-### Phase 2 (Planned)
-- [ ] User authentication & role-based access control
-- [ ] Real-time notifications for escalations
-- [ ] Historical analytics dashboard
-- [ ] Advanced search & filtering
-- [ ] Export reports (PDF/CSV)
-
-### Phase 3 (Future)
-- [ ] Machine learning model integration
-- [ ] Predictive wait time forecasting
-- [ ] Mobile app for nurses/doctors
-- [ ] Integration with hospital EMR systems
-- [ ] Multi-language support
-- [ ] Automated vitals input via medical devices
-
----
-
-**Built with ❤️ for emergency healthcare optimization**
-
----
-
-*Last Updated: October 23, 2025*
